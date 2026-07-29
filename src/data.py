@@ -69,6 +69,12 @@ def ttl_cache(ttl: float):
     return deco
 
 
+def clear_cache(prefix: str = "") -> None:
+    """清除内存 TTL 缓存（prefix 限定函数名前缀，空=全部）。"""
+    for k in [k for k in _CACHE if k.startswith(prefix)]:
+        _CACHE.pop(k, None)
+
+
 def _need_akshare():
     if not _AKSHARE_OK:
         raise RuntimeError(
@@ -205,19 +211,27 @@ HIST_COLS = ["日期", "开盘", "收盘", "最高", "最低", "成交量", "成
 
 @ttl_cache(cfg.HIST_TTL)
 def get_stock_hist(code: str, days: int = 120, adjust: str = "qfq") -> pd.DataFrame:
-    """个股日线，附加 MA5/10/20、N日涨幅、近 N 日最高。"""
+    """个股日线，附加 MA5/10/20、N日涨幅、近 N 日最高。akshare 优先，失败回退同花顺。"""
     _need_akshare()
     end = datetime.now().strftime("%Y%m%d")
     start = (datetime.now() - timedelta(days=days + 60)).strftime("%Y%m%d")
+    df = pd.DataFrame()
     try:
         df = retry()(ak.stock_zh_a_hist)(
             symbol=code, period="daily", start_date=start, end_date=end, adjust=adjust
         )
     except Exception as e:
         logger.debug("hist %s 失败：%s", code, e)
-        return _empty(HIST_COLS)
+    if df.empty and cfg.THS_API_KEY:
+        try:
+            from src import ths_data
+            df = ths_data.historical(ths_data._to_thscode(code), days=days + 10)
+            if not df.empty:
+                df = df.tail(days + 5).reset_index(drop=True)
+        except Exception as e:
+            logger.debug("同花顺 hist %s 失败：%s", code, e)
     if df.empty:
-        return df
+        return _empty(HIST_COLS)
     df = df.tail(days + 5).reset_index(drop=True)
     for c in ("收盘", "最高", "最低", "开盘", "成交量", "成交额", "涨跌幅", "换手率"):
         if c in df.columns:
@@ -789,4 +803,11 @@ def metrics_cache_status() -> dict:
 
 # ── 自检 ──────────────────────────────────────────────────────────────────
 def health() -> dict:
-    return {"akshare": _AKSHARE_OK, "qwen_key": bool(cfg.QWEN_API_KEY)}
+    _ths_ok = False
+    try:
+        from src import ths_data
+        _ths_ok = ths_data.health()
+    except Exception:
+        pass
+    return {"akshare": _AKSHARE_OK, "qwen_key": bool(cfg.QWEN_API_KEY),
+            "ths_key": bool(cfg.THS_API_KEY), "ths_api": _ths_ok}

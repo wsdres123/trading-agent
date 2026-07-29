@@ -60,6 +60,27 @@ QWEN_API_KEY_MASKED = _ks.mask(QWEN_API_KEY)
 for _k in _KEY_NAMES:
     if os.environ.get(_k):
         os.environ[_k] = _ks.PLACEHOLDER
+
+# ── 同花顺金融数据 API（fuyao.aicubes.cn）─────────────────────────────────
+_THS_KEY_NAMES = ("THS_API_KEY",)
+_THS_KEYSTORE = DATA_DIR / ".keystore.ths"
+
+
+def _resolve_ths_api_key() -> str:
+    raw = os.environ.get("THS_API_KEY", "")
+    if raw and raw != _ks.PLACEHOLDER:
+        if _ks.save_key(_THS_KEYSTORE, raw):
+            _ks.scrub_env_file(PROJECT_ROOT / ".env", _THS_KEY_NAMES, raw)
+        return raw
+    return _ks.load_key(_THS_KEYSTORE)
+
+
+THS_API_KEY = _resolve_ths_api_key()
+THS_API_KEY_MASKED = _ks.mask(THS_API_KEY)
+if os.environ.get("THS_API_KEY"):
+    os.environ["THS_API_KEY"] = _ks.PLACEHOLDER
+THS_BASE_URL = os.environ.get("THS_BASE_URL", "https://fuyao.aicubes.cn/api")
+
 QWEN_BASE_URL = os.environ.get("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 QWEN_CHAT_MODEL = os.environ.get("QWEN_CHAT_MODEL", "qwen3.7-max")
 QWEN_EMBEDDING_MODEL = os.environ.get("QWEN_EMBEDDING_MODEL", "text-embedding-v3")

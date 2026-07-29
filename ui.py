@@ -74,7 +74,7 @@ st.markdown(f"""
 # ── 顶部标题 ──────────────────────────────────────────────────────────────
 st.markdown(
     f'<div class="title-bar"><h1>劫财AI交易</h1>'
-    f'<div class="sub">指数择时 · 主线模式 · 个股模式 · AI助手 ｜ 多数据源实时更新</div></div>',
+    f'<div class="sub">指数择时 · 主线模式 · 短线模式 · 个股模式 · AI助手 ｜ 多数据源实时更新</div></div>',
     unsafe_allow_html=True,
 )
 
@@ -84,10 +84,11 @@ _kstatus = knowledge.status()
 _status_chips = []
 _status_chips.append(f'<span class="chip">数据源(akshare): <span class="k">{"在线" if _health["akshare"] else "离线"}</span></span>')
 _status_chips.append(f'<span class="chip">千问API: <span class="k">{"已配置" if _health["qwen_key"] else "未配置"}</span></span>')
+_status_chips.append(f'<span class="chip">同花顺API: <span class="k">{"在线" if _health.get("ths_api") else "离线"}</span></span>')
 _status_chips.append(f'<span class="chip">知识库: <span class="k">{_kstatus["files"]} 文件</span></span>')
 st.markdown("".join(_status_chips), unsafe_allow_html=True)
 
-_FEATURES = ["指数择时", "主线模式", "个股模式", "AI助手"]
+_FEATURES = ["指数择时", "主线模式", "短线模式", "个股模式", "AI助手"]
 _feature = st.radio("功能", _FEATURES, horizontal=True, label_visibility="collapsed")
 
 
@@ -284,23 +285,29 @@ if _feature == "指数择时":
     from src import index_timing as it
 
     def _kline_fig(df: pd.DataFrame, title: str, marks: dict | None = None,
-                   height: int = 620) -> "go.Figure":
-        """日K + MA5/10/30/60；marks={日期:{signal,source}} 多标在K线下方、空/转标在上方。"""
+                   height: int = 620,
+                   ma_lines: tuple[tuple[int, str, str], ...] | None = None) -> "go.Figure":
+        """日K + 可定制均线；marks={日期:{signal,source}} 多标在K线下方、空/转标在上方。"""
         fig = go.Figure()
         pct = (df["收盘"] / df["收盘"].shift(1) - 1) * 100
         fig.add_trace(go.Candlestick(
             x=df["日期"], open=df["开盘"], high=df["最高"], low=df["最低"], close=df["收盘"],
             increasing_line_color=cfg.COLOR_UP, increasing_fillcolor=cfg.COLOR_UP,
             decreasing_line_color=cfg.COLOR_DOWN, decreasing_fillcolor=cfg.COLOR_DOWN,
-            name=title, showlegend=False, hoverinfo="skip"))
-        fig.add_trace(go.Scatter(
-            x=df["日期"], y=df["收盘"], mode="lines", opacity=0, showlegend=False,
-            customdata=pct.round(2), name="",
-            hovertemplate="%{x}<br>涨跌幅 %{customdata:+.2f}%<extra></extra>"))
-        for n, color in ((5, "#f7d774"), (10, "#4dd0e1"), (30, "#ba68c8"), (60, "#90a4ae")):
+            name=title, showlegend=False,
+            customdata=pct.round(2),
+            hovertemplate="%{x}<br>"
+                          "开盘 %{open:.2f}<br>"
+                          "最高 %{high:.2f}<br>"
+                          "最低 %{low:.2f}<br>"
+                          "收盘 %{close:.2f}<br>"
+                          "涨跌幅 %{customdata:+.2f}%<extra></extra>"))
+        _ma_default = ((5, "MA5", "#f7d774"), (10, "MA10", "#4dd0e1"),
+                       (30, "MA30", "#ba68c8"), (60, "MA60", "#90a4ae"))
+        for n, label, color in (ma_lines or _ma_default):
             fig.add_trace(go.Scatter(
                 x=df["日期"], y=df["收盘"].rolling(n).mean().round(2),
-                name=f"MA{n}", line=dict(width=1.3, color=color), hoverinfo="skip"))
+                name=label, line=dict(width=1.5, color=color), hoverinfo="skip"))
         if marks:
             d2i = {d: i for i, d in enumerate(df["日期"])}
             span = float(df["最高"].max() - df["最低"].min()) or 1.0
@@ -322,14 +329,16 @@ if _feature == "指数择时":
                         textfont=dict(color=color, size=10, family=cfg.FONT_FAMILY),
                         hovertext=hover, hoverinfo="text"))
         fig.update_xaxes(type="category", nticks=10, showgrid=False,
-                         tickfont=dict(size=12), tickangle=-45,
-                         rangeslider_visible=False)
-        fig.update_yaxes(gridcolor="#222")
+                         tickfont=dict(size=12, color=cfg.COLOR_TEXT),
+                         tickangle=-45, rangeslider_visible=False)
+        fig.update_yaxes(gridcolor="#222", showticklabels=True,
+                         tickfont=dict(size=12, color=cfg.COLOR_TEXT),
+                         side="left")
         fig.update_layout(
             title=dict(text=title, font=dict(size=18, color=cfg.COLOR_TEXT)),
             height=height, paper_bgcolor=cfg.COLOR_BG, plot_bgcolor="#141414",
             font=dict(color=cfg.COLOR_TEXT, size=13, family=cfg.FONT_FAMILY),
-            margin=dict(l=10, r=10, t=48, b=60), hovermode="x unified",
+            margin=dict(l=55, r=10, t=48, b=60), hovermode="x unified",
             dragmode="pan",
             legend=dict(orientation="h", y=1.06, x=0, bgcolor="rgba(0,0,0,0)"))
         return fig
@@ -399,7 +408,7 @@ if _feature == "指数择时":
                              horizontal=True, label_visibility="collapsed")
     with _c_rf:
         if st.button("🔄 刷新行情", use_container_width=True):
-            data.get_index_daily.cache_clear()
+            data.clear_cache("get_index_daily")
             st.rerun()
     _sym = data.INDEX_KLINE_SYMBOLS[_idx_name]
     _idf = data.get_index_daily(_sym, days=1060)
@@ -407,13 +416,11 @@ if _feature == "指数择时":
         st.error("指数日K数据获取失败，请稍后刷新重试。")
     else:
         _idf = _idf.tail(1000).reset_index(drop=True)
-        _marks = it.all_signals() if _idx_name == "上证指数" else None
         st.plotly_chart(_kline_fig(_idf,
-                                   f"{_idx_name} 日K（{len(_idf)}天 · MA5/10/30/60"
-                                   f"{' · 多空转标记' if _marks else ''}）", marks=_marks),
+                                   f"{_idx_name} 日K（{len(_idf)}天 · MA5/10/30/60）"),
                         use_container_width=True, theme=None, config=_PLOTLY_CFG)
 
-    # ── 平均股价日K ───────────────────────────────────────────────────────
+    # ── 平均股价日K（多空线 = MA10，多空转标记在此）──────────────────────────
     _avg = it.avg_price_kline(days=360)
     if _avg.empty:
         st.warning("平均股价需先构建 390 日全市场数据缓存（约1-2分钟）。")
@@ -427,8 +434,12 @@ if _feature == "指数择时":
             prog.empty()
             st.rerun()
     else:
-        st.plotly_chart(_kline_fig(_avg, f"全市场平均股价 日K（{len(_avg)}天 · MA5/10/30/60）",
-                                   height=520),
+        _marks = it.all_signals()
+        st.plotly_chart(_kline_fig(_avg,
+                                   f"全市场平均股价 日K（{len(_avg)}天 · 多空线=MA10"
+                                   f"{' · 多空转标记' if _marks else ''}）",
+                                   height=520, marks=_marks,
+                                   ma_lines=((10, "多空线", "#4dd0e1"),)),
                         use_container_width=True, theme=None, config=_PLOTLY_CFG)
 
     with st.expander("📖 中级周期规范（node_spec.md）"):
@@ -439,6 +450,10 @@ if _feature == "指数择时":
 elif _feature == "主线模式":
     placeholder("主线模式", "theme_spec.md",
                 "在趋势A/C周期中识别主线板块，跟踪趋势核心/补涨/主线ETF。")
+
+elif _feature == "短线模式":
+    placeholder("短线模式", "node_spec.md",
+                "短线周期判断与情绪博弈（连板空间/分歧转一致/弱转强等），规则待补充。")
 
 elif _feature == "个股模式":
     placeholder("个股模式", "theme_stock_spec.md",
