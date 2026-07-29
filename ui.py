@@ -290,18 +290,18 @@ if _feature == "指数择时":
         """日K + 可定制均线；marks={日期:{signal,source}} 多标在K线下方、空/转标在上方。"""
         fig = go.Figure()
         pct = (df["收盘"] / df["收盘"].shift(1) - 1) * 100
+        _hover = [
+            f"{d}<br>开盘 {o:.2f}<br>最高 {h:.2f}<br>最低 {l:.2f}<br>收盘 {c:.2f}"
+            + (f"<br>涨跌幅 {p:+.2f}%" if pd.notna(p) else "")
+            for d, o, h, l, c, p in zip(df["日期"], df["开盘"], df["最高"],
+                                        df["最低"], df["收盘"], pct)
+        ]
         fig.add_trace(go.Candlestick(
             x=df["日期"], open=df["开盘"], high=df["最高"], low=df["最低"], close=df["收盘"],
             increasing_line_color=cfg.COLOR_UP, increasing_fillcolor=cfg.COLOR_UP,
             decreasing_line_color=cfg.COLOR_DOWN, decreasing_fillcolor=cfg.COLOR_DOWN,
             name=title, showlegend=False,
-            customdata=pct.round(2),
-            hovertemplate="%{x}<br>"
-                          "开盘 %{open:.2f}<br>"
-                          "最高 %{high:.2f}<br>"
-                          "最低 %{low:.2f}<br>"
-                          "收盘 %{close:.2f}<br>"
-                          "涨跌幅 %{customdata:+.2f}%<extra></extra>"))
+            text=_hover, hoverinfo="text"))
         _ma_default = ((5, "MA5", "#f7d774"), (10, "MA10", "#4dd0e1"),
                        (30, "MA30", "#ba68c8"), (60, "MA60", "#90a4ae"))
         for n, label, color in (ma_lines or _ma_default):
