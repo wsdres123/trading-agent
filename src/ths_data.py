@@ -49,8 +49,13 @@ def _request(path: str, params: dict | None = None, timeout: int = 15) -> dict:
 
 
 def health() -> bool:
-    """简单探测：尝试取茅台快照。"""
-    return not snapshot("600519.SH").empty
+    """简单探测：尝试取茅台快照（短超时，避免阻塞页面）。"""
+    try:
+        item = (_request("a-share/prices/snapshot",
+                         {"thscodes": "600519.SH"}, timeout=3) or {}).get("item")
+        return bool(item)
+    except Exception:
+        return False
 
 
 def _to_thscode(code6: str) -> str:
@@ -147,3 +152,22 @@ def _to_float(v) -> float | None:
 def index_snapshot(thscodes: str = "000001.SH") -> pd.DataFrame:
     """指数快照。"""
     return snapshot(thscodes)
+
+
+def hot_stock_list(period: str = "day") -> pd.DataFrame:
+    """同花顺热榜（A股热股榜单）。period: day=24小时榜 / hour=小时榜。
+
+    返回 排名/代码/名称/热度/排名变化。
+    """
+    data = _request("a-share/special-data/hot-stock-list", {"period": period})
+    items = data.get("item") if isinstance(data, dict) else None
+    if not items:
+        return pd.DataFrame()
+    rows = [{
+        "排名": it.get("rank"),
+        "代码": str(it.get("ticker", "")),
+        "名称": it.get("name", ""),
+        "热度": _to_float(it.get("heat")),
+        "排名变化": it.get("rank_change"),
+    } for it in items]
+    return pd.DataFrame(rows).sort_values("排名").reset_index(drop=True)

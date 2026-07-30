@@ -97,7 +97,7 @@ COLOR_MUTED = "#9ca3af"
 COLOR_ACCENT = "#1a56db"
 
 # 字体偏大，避免看不清
-FONT_SIZE = 16
+FONT_SIZE = 18
 FONT_FAMILY = "'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif"
 
 

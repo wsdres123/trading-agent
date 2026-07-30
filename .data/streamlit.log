@@ -1,0 +1,17 @@
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://0.0.0.0:8601
+
+/home/lixiang/anaconda3/lib/python3.11/site-packages/py_mini_racer/py_mini_racer.py:15: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+2026-07-30 15:20:27.346 Port 8601 is already in use
+  Stopping...
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://0.0.0.0:8601
+
+/home/lixiang/anaconda3/lib/python3.11/site-packages/py_mini_racer/py_mini_racer.py:15: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+  Stopping...

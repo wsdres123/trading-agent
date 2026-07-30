@@ -1,0 +1,97 @@
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://0.0.0.0:8601
+
+/home/lixiang/anaconda3/lib/python3.11/site-packages/py_mini_racer/py_mini_racer.py:15: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+2026-07-30 05:13:40.262 Session with id d1b01b0c-7a72-4dac-b3b4-8b9b6621e461 is already connected! Connecting to a new session.
+2026-07-30 07:01:55.990 Session with id 496a0fcc-2c02-46bc-be2f-d91c70428e73 is already connected! Connecting to a new session.
+2026-07-30 12:47:53.966 Uncaught app exception
+Traceback (most recent call last):
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 535, in _run_script
+    exec(code, module.__dict__)
+  File "/home/lixiang/langchain/bigA/trading-agent_new/ui.py", line 705, in <module>
+    _ifig = go.Figure(go.Candlestick(
+                      ^^^^^^^^^^^^^^^
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/plotly/graph_objs/_candlestick.py", line 1911, in __init__
+    self._process_kwargs(**dict(arg, **kwargs))
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/plotly/basedatatypes.py", line 4377, in _process_kwargs
+    raise err
+ValueError: Invalid property specified for object of type plotly.graph_objs.candlestick.Increasing: 'linecolor'
+
+Did you mean "fillcolor"?
+
+    Valid properties:
+        fillcolor
+            Sets the fill color. Defaults to a half-transparent
+            variant of the line color, marker color, or marker line
+            color, whichever is available.
+        line
+            :class:`plotly.graph_objects.candlestick.increasing.Lin
+            e` instance or dict with compatible properties
+        
+Did you mean "fillcolor"?
+
+Bad property path:
+increasing_linecolor
+           ^^^^^^^^^
+2026-07-30 12:47:56.583 Uncaught app exception
+Traceback (most recent call last):
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 535, in _run_script
+    exec(code, module.__dict__)
+  File "/home/lixiang/langchain/bigA/trading-agent_new/ui.py", line 705, in <module>
+    _ifig = go.Figure(go.Candlestick(
+                      ^^^^^^^^^^^^^^^
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/plotly/graph_objs/_candlestick.py", line 1911, in __init__
+    self._process_kwargs(**dict(arg, **kwargs))
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/plotly/basedatatypes.py", line 4377, in _process_kwargs
+    raise err
+ValueError: Invalid property specified for object of type plotly.graph_objs.candlestick.Increasing: 'linecolor'
+
+Did you mean "fillcolor"?
+
+    Valid properties:
+        fillcolor
+            Sets the fill color. Defaults to a half-transparent
+            variant of the line color, marker color, or marker line
+            color, whichever is available.
+        line
+            :class:`plotly.graph_objects.candlestick.increasing.Lin
+            e` instance or dict with compatible properties
+        
+Did you mean "fillcolor"?
+
+Bad property path:
+increasing_linecolor
+           ^^^^^^^^^
+2026-07-30 12:48:02.866 Uncaught app exception
+Traceback (most recent call last):
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 535, in _run_script
+    exec(code, module.__dict__)
+  File "/home/lixiang/langchain/bigA/trading-agent_new/ui.py", line 705, in <module>
+    _ifig = go.Figure(go.Candlestick(
+                      ^^^^^^^^^^^^^^^
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/plotly/graph_objs/_candlestick.py", line 1911, in __init__
+    self._process_kwargs(**dict(arg, **kwargs))
+  File "/home/lixiang/anaconda3/lib/python3.11/site-packages/plotly/basedatatypes.py", line 4377, in _process_kwargs
+    raise err
+ValueError: Invalid property specified for object of type plotly.graph_objs.candlestick.Increasing: 'linecolor'
+
+Did you mean "fillcolor"?
+
+    Valid properties:
+        fillcolor
+            Sets the fill color. Defaults to a half-transparent
+            variant of the line color, marker color, or marker line
+            color, whichever is available.
+        line
+            :class:`plotly.graph_objects.candlestick.increasing.Lin
+            e` instance or dict with compatible properties
+        
+Did you mean "fillcolor"?
+
+Bad property path:
+increasing_linecolor
+           ^^^^^^^^^
+  Stopping...

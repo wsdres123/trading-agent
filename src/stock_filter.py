@@ -30,7 +30,10 @@ RESULT_COLS = ["代码", "名称", "最新价", "涨跌幅", "成交额", "流�
 
 def _has_hist_only_conds(conds: list) -> bool:
     """是否含需历史K线才能验证的条件。"""
-    return any(c["field"] in ("close_gt_ma", "return_ndays", "new_high") for c in conds)
+    hist_fields = ("close_gt_ma", "close_lt_ma", "return_ndays", "new_high", "new_low",
+                   "consecutive_up", "consecutive_down", "ma_bullish", "ma_bearish",
+                   "volume_surge", "drawdown_from_high")
+    return any(c["field"] in hist_fields for c in conds)
 
 
 def _board_of(code: str) -> str:
@@ -66,10 +69,17 @@ def _price_matrix(df: pd.DataFrame, col: str) -> "np.ndarray | None":
     return M
 
 
+def _num_col(df: pd.DataFrame, col: str) -> pd.Series:
+    """安全取数值列，缺失时返回全 NaN（比较结果自然不命中）。"""
+    if col in df.columns:
+        return pd.to_numeric(df[col], errors="coerce")
+    return pd.Series(np.nan, index=df.index)
+
+
 def _filter_from_cache(cache: pd.DataFrame, conditions: list) -> pd.DataFrame:
     """基于本地指标缓存做向量化筛选，零联网、毫秒级。
 
-    缓存内含 110 日收盘/最高序列，任意 N 日涨幅/均线/新高均可现算。
+    缓存内含 110 日 OHLCV 序列，任意 N 日涨幅/均线/新高/新低/量比均可现算。
     """
     df = cache.reset_index(drop=True)
     df["代码"] = df["代码"].astype(str).str.zfill(6)
@@ -80,18 +90,47 @@ def _filter_from_cache(cache: pd.DataFrame, conditions: list) -> pd.DataFrame:
             s = spot.copy()
             s["代码"] = s["代码"].astype(str).str.zfill(6)
             s = s.drop_duplicates("代码").set_index("代码")
-            for col in ("最新价", "涨跌幅", "成交额", "流通市值_亿"):
+            for col in ("最新价", "涨跌幅", "成交额", "流通市值_亿",
+                        "换手率", "总市值_亿", "成交量"):
                 if col in s.columns:
                     live = df["代码"].map(pd.to_numeric(s[col], errors="coerce"))
                     df[col] = live.fillna(df[col]) if col in df.columns else live
     except Exception as e:
         logger.warning("实时快照合并失败，沿用缓存值：%s", e)
-    C = H = None  # 收盘/最高矩阵，懒加载
+    C = H = L = V = None  # 收盘/最高/最低/成交量矩阵，懒加载
     mask = pd.Series([True] * len(df), index=df.index)
     for c in conditions:
         f = c["field"]
         if f == "free_float_cap":
-            mask &= df["流通市值_亿"].astype(float) >= float(c["min_yi"])
+            v = _num_col(df, "流通市值_亿")
+            if c.get("min_yi") is not None:
+                mask &= v >= float(c["min_yi"])
+            if c.get("max_yi") is not None:
+                mask &= v <= float(c["max_yi"])
+        elif f == "total_cap":
+            v = _num_col(df, "总市值_亿")
+            if c.get("min_yi") is not None:
+                mask &= v >= float(c["min_yi"])
+            if c.get("max_yi") is not None:
+                mask &= v <= float(c["max_yi"])
+        elif f == "amount":
+            v = _num_col(df, "成交额") / 1e8
+            if c.get("min_yi") is not None:
+                mask &= v >= float(c["min_yi"])
+            if c.get("max_yi") is not None:
+                mask &= v <= float(c["max_yi"])
+        elif f == "turnover_rate":
+            v = _num_col(df, "换手率")
+            if c.get("min_pct") is not None:
+                mask &= v >= float(c["min_pct"])
+            if c.get("max_pct") is not None:
+                mask &= v <= float(c["max_pct"])
+        elif f == "price":
+            v = _num_col(df, "最新价")
+            if c.get("min") is not None:
+                mask &= v >= float(c["min"])
+            if c.get("max") is not None:
+                mask &= v <= float(c["max"])
         elif f == "board":
             mask &= df["代码"].map(lambda x: _board_hit(x, c))
         elif f == "sector":
@@ -99,13 +138,16 @@ def _filter_from_cache(cache: pd.DataFrame, conditions: list) -> pd.DataFrame:
             if not codes:
                 return data._empty(RESULT_COLS)
             mask &= df["代码"].isin(codes)
-        elif f == "close_gt_ma":
+        elif f in ("close_gt_ma", "close_lt_ma"):
+            gt = f == "close_gt_ma"
             n = int(c["ma"])
             m_days = int(c.get("days", 1) or 1)
             if m_days <= 1:
                 ma_col = {5: "ma5", 10: "ma10", 20: "ma20"}.get(n)
                 if ma_col and ma_col in df.columns:
-                    mask &= df["close"].astype(float) > df[ma_col].astype(float)
+                    close_v = df["close"].astype(float)
+                    ma_v = df[ma_col].astype(float)
+                    mask &= (close_v > ma_v) if gt else (close_v < ma_v)
                     continue
             if C is None:
                 C = _price_matrix(df, "closes")
@@ -115,37 +157,97 @@ def _filter_from_cache(cache: pd.DataFrame, conditions: list) -> pd.DataFrame:
             for j in range(m_days):  # j=0 为最新一日，逐日回看
                 end = C.shape[1] - j
                 ma = C[:, end - n:end].mean(axis=1)  # 含 NaN 则为 NaN → 不命中
-                day_ok = C[:, end - 1] > ma
+                day_ok = (C[:, end - 1] > ma) if gt else (C[:, end - 1] < ma)
                 ok &= np.where(np.isnan(ma) | np.isnan(C[:, end - 1]), False, day_ok)
             mask &= pd.Series(ok, index=df.index)
         elif f == "return_ndays":
-            days, min_pct = int(c["days"]), float(c["min_pct"])
-            if days == 1:  # 今日涨幅：用实时涨跌幅，而非缓存K线
-                mask &= pd.to_numeric(df["涨跌幅"], errors="coerce").fillna(-1e9) >= min_pct
-                continue
-            col = {5: "ret_5d", 30: "ret_30d"}.get(days)
-            if col and col in df.columns:
-                mask &= df[col].astype(float) >= min_pct
-            else:
-                if C is None:
-                    C = _price_matrix(df, "closes")
-                if C is None or C.shape[1] < days + 1:
-                    return data._empty(RESULT_COLS)
-                ret = (C[:, -1] / C[:, -days - 1] - 1) * 100
-                mask &= pd.Series(ret >= min_pct, index=df.index).fillna(False)
-        elif f == "new_high":
             days = int(c["days"])
-            if days == 100 and "is_100d_new_high" in df.columns:
+            mn, mx = c.get("min_pct"), c.get("max_pct")
+            if days == 1:  # 今日涨幅：用实时涨跌幅，而非缓存K线
+                r = _num_col(df, "涨跌幅")
+            else:
+                col = {5: "ret_5d", 30: "ret_30d"}.get(days)
+                if col and col in df.columns:
+                    r = df[col].astype(float)
+                else:
+                    if C is None:
+                        C = _price_matrix(df, "closes")
+                    if C is None or C.shape[1] < days + 1:
+                        return data._empty(RESULT_COLS)
+                    r = pd.Series((C[:, -1] / C[:, -days - 1] - 1) * 100, index=df.index)
+            if mn is not None:
+                mask &= r >= float(mn)
+            if mx is not None:
+                mask &= r <= float(mx)
+        elif f in ("new_high", "new_low"):
+            days = int(c["days"])
+            if f == "new_high" and days == 100 and "is_100d_new_high" in df.columns:
                 mask &= df["is_100d_new_high"].astype(bool)
+                continue
+            if C is None:
+                C = _price_matrix(df, "closes")
+            M = None
+            if f == "new_high":
+                if H is None:
+                    H = _price_matrix(df, "highs")
+                M = H
+            else:
+                if L is None:
+                    L = _price_matrix(df, "lows")
+                M = L
+            if M is None or C is None or M.shape[1] < days:
+                return data._empty(RESULT_COLS)
+            ext = np.nanmax(M[:, -days:], axis=1) if f == "new_high" \
+                else np.nanmin(M[:, -days:], axis=1)
+            hit = C[:, -1] >= ext if f == "new_high" else C[:, -1] <= ext
+            mask &= pd.Series(hit, index=df.index).fillna(False)
+        elif f in ("consecutive_up", "consecutive_down"):
+            d = int(c["days"])
+            if C is None:
+                C = _price_matrix(df, "closes")
+            if C is None or C.shape[1] < d + 1:
+                return data._empty(RESULT_COLS)
+            seg = C[:, -d - 1:]
+            diffs = np.diff(seg, axis=1)
+            ok = np.all(diffs > 0, axis=1) if f == "consecutive_up" \
+                else np.all(diffs < 0, axis=1)
+            ok &= ~np.isnan(seg).any(axis=1)
+            mask &= pd.Series(ok, index=df.index)
+        elif f in ("ma_bullish", "ma_bearish"):
+            ma5, ma10, ma20 = (_num_col(df, "ma5"), _num_col(df, "ma10"),
+                               _num_col(df, "ma20"))
+            mask &= ((ma5 > ma10) & (ma10 > ma20)) if f == "ma_bullish" \
+                else ((ma5 < ma10) & (ma10 < ma20))
+        elif f == "volume_surge":
+            ratio = float(c.get("ratio", 2))
+            if V is None:
+                V = _price_matrix(df, "volumes")
+            if V is None or V.shape[1] < 6:
+                return data._empty(RESULT_COLS)
+            avg5 = np.nanmean(V[:, -6:-1], axis=1)  # 前5日均量（不含最新一根）
+            live_v = _num_col(df, "成交量").to_numpy(dtype=float)
+            vol = np.where(np.isnan(live_v), V[:, -1], live_v)
+            ok = (avg5 > 0) & (vol >= avg5 * ratio)
+            mask &= pd.Series(np.where(np.isnan(vol) | np.isnan(avg5), False, ok),
+                              index=df.index)
+        elif f == "drawdown_from_high":
+            days = int(c.get("days", 100) or 100)
+            if days == 100 and "high_100d" in df.columns:
+                hi = pd.to_numeric(df["high_100d"], errors="coerce").to_numpy(dtype=float)
             else:
                 if H is None:
                     H = _price_matrix(df, "highs")
-                if C is None:
-                    C = _price_matrix(df, "closes")
-                if H is None or C is None or H.shape[1] < days:
+                if H is None or H.shape[1] < days:
                     return data._empty(RESULT_COLS)
                 hi = np.nanmax(H[:, -days:], axis=1)
-                mask &= pd.Series(C[:, -1] >= hi, index=df.index).fillna(False)
+            close_v = pd.to_numeric(df["close"], errors="coerce").to_numpy(dtype=float)
+            dd = (1 - close_v / hi) * 100
+            ok = ~np.isnan(dd)
+            if c.get("max_pct") is not None:
+                ok &= dd <= float(c["max_pct"])
+            if c.get("min_pct") is not None:
+                ok &= dd >= float(c["min_pct"])
+            mask &= pd.Series(ok, index=df.index)
     res = df[mask]
     keep = [c for c in RESULT_COLS if c in res.columns]
     res = res[keep].sort_values("涨跌幅", ascending=False, na_position="last")
@@ -205,19 +307,45 @@ def run_filter(conditions: list, progress_cb=None, use_cache: bool = True) -> pd
         return data._empty(RESULT_COLS)
 
     df = spot.copy()
-    # ── 粗筛：流通市值、市场板块、板块 ──
+    # ── 粗筛：市值、成交额、换手率、股价、市场板块、板块 ──
     for c in conditions:
         if c["field"] == "free_float_cap":
-            col = "流通市值_亿" if "流通市值_亿" in df.columns else None
-            if col is None and "流通市值" in df.columns:
+            if "流通市值_亿" not in df.columns and "流通市值" in df.columns:
                 df["流通市值_亿"] = (df["流通市值"].astype(float) / 1e8).round(2)
-                col = "流通市值_亿"
-            if col:
-                df = df[df[col].astype(float) >= float(c["min_yi"])]
+            v = _num_col(df, "流通市值_亿")
+            if c.get("min_yi") is not None:
+                df = df[v >= float(c["min_yi"])]
+            if c.get("max_yi") is not None:
+                df = df[_num_col(df, "流通市值_亿") <= float(c["max_yi"])]
+        elif c["field"] == "total_cap":
+            if "总市值_亿" not in df.columns and "总市值" in df.columns:
+                df["总市值_亿"] = (df["总市值"].astype(float) / 1e8).round(2)
+            if c.get("min_yi") is not None:
+                df = df[_num_col(df, "总市值_亿") >= float(c["min_yi"])]
+            if c.get("max_yi") is not None:
+                df = df[_num_col(df, "总市值_亿") <= float(c["max_yi"])]
+        elif c["field"] == "amount":
+            if c.get("min_yi") is not None:
+                df = df[_num_col(df, "成交额") / 1e8 >= float(c["min_yi"])]
+            if c.get("max_yi") is not None:
+                df = df[_num_col(df, "成交额") / 1e8 <= float(c["max_yi"])]
+        elif c["field"] == "turnover_rate":
+            if c.get("min_pct") is not None:
+                df = df[_num_col(df, "换手率") >= float(c["min_pct"])]
+            if c.get("max_pct") is not None:
+                df = df[_num_col(df, "换手率") <= float(c["max_pct"])]
+        elif c["field"] == "price":
+            if c.get("min") is not None:
+                df = df[_num_col(df, "最新价") >= float(c["min"])]
+            if c.get("max") is not None:
+                df = df[_num_col(df, "最新价") <= float(c["max"])]
         elif c["field"] == "board":
             df = df[df["代码"].astype(str).str.zfill(6).map(lambda x: _board_hit(x, c))]
         elif c["field"] == "return_ndays" and int(c["days"]) == 1:
-            df = df[pd.to_numeric(df["涨跌幅"], errors="coerce") >= float(c["min_pct"])]
+            if c.get("min_pct") is not None:
+                df = df[pd.to_numeric(df["涨跌幅"], errors="coerce") >= float(c["min_pct"])]
+            if c.get("max_pct") is not None:
+                df = df[pd.to_numeric(df["涨跌幅"], errors="coerce") <= float(c["max_pct"])]
         elif c["field"] == "sector":
             codes = data.sector_to_codes(c["name"])
             if not codes:  # 板块未命中：尝试模糊
@@ -296,7 +424,8 @@ def _match_hist(m: dict, conds: list) -> bool:
     """校验个股指标是否满足所有历史类条件。"""
     for c in conds:
         f = c["field"]
-        if f == "close_gt_ma":
+        if f in ("close_gt_ma", "close_lt_ma"):
+            gt = f == "close_gt_ma"
             n = int(c["ma"])
             m_days = int(c.get("days", 1) or 1)
             if m_days <= 1:
@@ -306,7 +435,7 @@ def _match_hist(m: dict, conds: list) -> bool:
                     if len(closes) < n:
                         return False
                     ma = float(np.mean(closes[-n:]))
-                if m["close"] <= ma:
+                if (m["close"] <= ma) if gt else (m["close"] >= ma):
                     return False
             else:
                 closes = m.get("closes") or []
@@ -315,24 +444,74 @@ def _match_hist(m: dict, conds: list) -> bool:
                 arr = np.asarray(closes, dtype=float)
                 for j in range(m_days):
                     end = len(arr) - j
-                    if arr[end - 1] <= arr[end - n:end].mean():
+                    ma = arr[end - n:end].mean()
+                    if (arr[end - 1] <= ma) if gt else (arr[end - 1] >= ma):
                         return False
         elif f == "return_ndays":
-            days, min_pct = int(c["days"]), float(c["min_pct"])
+            days = int(c["days"])
             if days == 1:
                 continue  # 今日涨幅已在粗筛用实时涨跌幅过滤
-            key = {5: "ret_5d", 30: "ret_30d"}.get(days)
             if days == 5:
                 val = m["ret_5d"]
             elif days == 30:
                 val = m["ret_30d"]
             else:
-                # 其他天数：实时算
                 val = _calc_nday_return(m["code"], days)
-            if val is None or val < min_pct:
+            if val is None:
+                return False
+            if c.get("min_pct") is not None and val < float(c["min_pct"]):
+                return False
+            if c.get("max_pct") is not None and val > float(c["max_pct"]):
                 return False
         elif f == "new_high":
-            if c["days"] == 100 and not m["is_100d_new_high"]:
+            days = int(c["days"])
+            if days == 100:
+                if not m["is_100d_new_high"]:
+                    return False
+            else:
+                highs = m.get("highs") or []
+                if len(highs) < days or m["close"] < max(highs[-days:]):
+                    return False
+        elif f == "new_low":
+            # 指标缺最低价序列，用收盘序列近似
+            days = int(c["days"])
+            closes = m.get("closes") or []
+            if len(closes) < days or m["close"] > min(closes[-days:]):
+                return False
+        elif f in ("consecutive_up", "consecutive_down"):
+            d = int(c["days"])
+            closes = m.get("closes") or []
+            if len(closes) < d + 1:
+                return False
+            seg = np.asarray(closes[-d - 1:], dtype=float)
+            diffs = np.diff(seg)
+            if f == "consecutive_up" and not np.all(diffs > 0):
+                return False
+            if f == "consecutive_down" and not np.all(diffs < 0):
+                return False
+        elif f in ("ma_bullish", "ma_bearish"):
+            ma5, ma10, ma20 = m.get("ma5"), m.get("ma10"), m.get("ma20")
+            if None in (ma5, ma10, ma20):
+                return False
+            if f == "ma_bullish" and not (ma5 > ma10 > ma20):
+                return False
+            if f == "ma_bearish" and not (ma5 < ma10 < ma20):
+                return False
+        elif f == "volume_surge":
+            return False  # 实时回退路径无成交量序列，无法验证
+        elif f == "drawdown_from_high":
+            days = int(c.get("days", 100) or 100)
+            if days == 100:
+                hi = m.get("high_100d")
+            else:
+                highs = m.get("highs") or []
+                hi = max(highs[-days:]) if len(highs) >= days else None
+            if not hi:
+                return False
+            dd = (1 - m["close"] / hi) * 100
+            if c.get("max_pct") is not None and dd > float(c["max_pct"]):
+                return False
+            if c.get("min_pct") is not None and dd < float(c["min_pct"]):
                 return False
     return True
 
