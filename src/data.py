@@ -89,7 +89,7 @@ def _empty(cols: list[str]) -> pd.DataFrame:
 
 
 # ── 个股实时快照 ──────────────────────────────────────────────────────────
-SPOT_COLS = ["代码", "名称", "最新价", "涨跌幅", "涨跌额", "成交量", "成交额",
+SPOT_COLS = ["代码", "名称", "最新价", "涨跌幅", "涨跌额", "最高", "成交量", "成交额",
              "换手率", "流通市值", "总市值"]
 
 _TENCENT_BATCH = 80
@@ -108,6 +108,7 @@ def _tencent_spot_batch(session, syms: list[str]) -> list[dict]:
             rows.append({
                 "代码": f[2], "名称": f[1],
                 "最新价": float(f[3]), "涨跌额": float(f[31]), "涨跌幅": float(f[32]),
+                "最高": float(f[33]) if f[33] else None,
                 "成交量": float(f[6]), "成交额": float(f[37]) * 1e4,
                 "换手率": float(f[38]) if f[38] else None,
                 "流通市值": float(f[44]) * 1e8 if f[44] else None,
@@ -166,7 +167,7 @@ def get_stock_spot() -> pd.DataFrame:
             return _empty(SPOT_COLS)
     keep = [c for c in SPOT_COLS if c in df.columns]
     df = df[keep].copy()
-    for c in ("最新价", "涨跌幅", "涨跌额", "成交量", "成交额", "换手率", "流通市值", "总市值"):
+    for c in ("最新价", "涨跌幅", "涨跌额", "最高", "成交量", "成交额", "换手率", "流通市值", "总市值"):
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
     if "流通市值" in df.columns:
@@ -174,6 +175,19 @@ def get_stock_spot() -> pd.DataFrame:
     if "总市值" in df.columns:
         df["总市值_亿"] = (df["总市值"] / 1e8).round(2)
     return df.reset_index(drop=True)
+
+
+def get_realtime_avg_price() -> dict:
+    """全市场实时平均股价（所有A股最新价算术均值）。"""
+    import time as _time
+    df = get_stock_spot()
+    prices = pd.to_numeric(df["最新价"], errors="coerce") if not df.empty else pd.Series([], dtype=float)
+    prices = prices[prices > 0].dropna()
+    return {
+        "avg_price": round(float(prices.mean()), 3) if len(prices) else None,
+        "stock_count": int(len(prices)),
+        "timestamp": _time.strftime("%H:%M:%S"),
+    }
 
 
 @ttl_cache(86400)

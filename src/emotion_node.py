@@ -62,6 +62,24 @@ def _limit_pct(code: str) -> float:
     return 10.0
 
 
+def daban_damian_count() -> int | None:
+    """打板大面数：主板盘中曾触及涨停价，但当前涨幅回落至5%以下的个股数。"""
+    try:
+        spot = data.get_stock_spot()
+        if spot.empty or "最高" not in spot.columns:
+            return None
+        pct = pd.to_numeric(spot["涨跌幅"], errors="coerce")
+        prev_close = pd.to_numeric(spot["最新价"], errors="coerce") - \
+            pd.to_numeric(spot["涨跌额"], errors="coerce")
+        lim = spot["代码"].astype(str).map(_limit_pct)
+        lim_price = (prev_close * (1 + lim / 100)).round(2)
+        touched = (pd.to_numeric(spot["最高"], errors="coerce") >= lim_price - 0.01).fillna(False)
+        is_main = ~spot["代码"].astype(str).str.startswith(("30", "68", "8", "4", "92"))
+        return int((touched & (pct < 5.0) & is_main).sum())
+    except Exception:
+        return None
+
+
 def hot_stock_stats() -> dict:
     """同花顺热榜前10热门股表现：热门个股指数(平均涨跌幅) + 明细。"""
     out: dict = {"hot_list": []}
@@ -93,6 +111,14 @@ def market_stats() -> dict:
         out["涨超7数"] = int((pct >= 7).sum())
         out["跌停数"] = int((pct <= -(lim - 0.2)).sum())
         out["涨停数"] = int((pct >= lim - 0.2).sum())
+        # 打板大面：主板盘中曾触及涨停价，但当前涨幅回落至5%以下
+        if "最高" in spot.columns:
+            prev_close = pd.to_numeric(spot["最新价"], errors="coerce") - \
+                pd.to_numeric(spot["涨跌额"], errors="coerce")
+            lim_price = (prev_close * (1 + lim / 100)).round(2)
+            touched = (pd.to_numeric(spot["最高"], errors="coerce") >= lim_price - 0.01).fillna(False)
+            is_main = ~spot["代码"].astype(str).str.startswith(("30", "68", "8", "4", "92"))
+            out["打板大面数"] = int((touched & (pct < 5.0) & is_main).sum())
     except Exception as e:
         logger.warning("盘面统计失败：%s", e)
     try:
@@ -138,7 +164,9 @@ def stats_history(days: int = 10) -> pd.DataFrame:
     if m is None:
         return pd.DataFrame()
     C, dates, codes = m["C"], m["dates"], m["codes"]
+    H = m.get("H")
     lim = np.array([_limit_pct(c) for c in codes])
+    is_main = np.array([not c.startswith(("30", "68", "8", "4", "92")) for c in codes])
     today = datetime.now().strftime("%Y-%m-%d")
     rows = []
     for i in range(max(1, C.shape[1] - days), C.shape[1]):
@@ -146,11 +174,17 @@ def stats_history(days: int = 10) -> pd.DataFrame:
             continue
         with np.errstate(invalid="ignore"):
             pct = (C[:, i] / C[:, i - 1] - 1) * 100
-        rows.append({"日期": dates[i],
-                     "大面数": int(np.nansum(pct <= -7)),
-                     "涨超7数": int(np.nansum(pct >= 7)),
-                     "跌停数": int(np.nansum(pct <= -(lim - 0.2))),
-                     "涨停数": int(np.nansum(pct >= lim - 0.2))})
+        row = {"日期": dates[i],
+               "大面数": int(np.nansum(pct <= -7)),
+               "涨超7数": int(np.nansum(pct >= 7)),
+               "跌停数": int(np.nansum(pct <= -(lim - 0.2))),
+               "涨停数": int(np.nansum(pct >= lim - 0.2))}
+        if H is not None and H.size and i > 0:
+            with np.errstate(invalid="ignore"):
+                hi_pct = (H[:, i] / C[:, i - 1] - 1) * 100
+            row["打板大面数"] = int(np.nansum(
+                (hi_pct >= lim - 0.2) & (pct < 5.0) & is_main))
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -168,38 +202,49 @@ def _save_predictions(d: dict) -> None:
     EMO_STORE.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
-JUDGE_PROMPT = """你是A股情绪周期研究员。请先学习【情绪节点规范】（emotional node.md），
-再参考【竞价表历史节点标注】的判定习惯，结合【近日盘面统计序列】与【今日盘面统计】，
-判断今天处于哪个情绪节点。只输出 JSON：
-{{"node": "节点名", "reason": "判断依据，80字内", "advice": "操作提示一句话"}}
+JUDGE_PROMPT = """A股情绪节点判断。只输出JSON：
+{{"node":"节点名","reason":"依据40字内","advice":"操作提示一句"}}
+节点选：{nodes}
 
-要求：
-- node 必须从以下节点中选一个：{nodes}
-- 大面数是相对的，必须与前几日比较，不能只看今天绝对值：
-  昨天大面很多、今天大幅减少 → 修复类（减少50%以下=弱修复，约70%=中等修复，90%以上=强修复）；
-  今天比昨天明显增加 → 退潮类。
-- 判定标准以规范为准（大面数变化、跌停数、赚亏钱效应、主线/核心个股状态、平均股价信号）。
-- 热门股表现很关键：热门股批量大跌/跌停→退潮类；热门股高开/涨停加速→主升类；
-  热门股分歧但未大面→主升分歧或分歧转一致。
-- 历史标注具有连续性参考价值：昨天退潮今天大面大减→修复类；昨天主升今天首次分歧→主升分歧。
-- 规则暂不完备，属初步判断，拿不准时选择更保守（偏混沌/修复）的节点。
+核心规则（按优先级）：
+0. 打板大面硬约束（不可被大面减幅覆盖）：≥10禁强修复（仅强修复有此限制）。
+1. 先看昨日是否大面多(≥30)。若是，今日大面骤减→修复类：减50%→弱修复，减70%→中等修复，减90%→强修复。但不得超出规则0的上限。不能判为主升。
+2. 昨日大面少且今日涨停大增/高度板加速→主升类。打板大面≥10则主升质量打折。
+3. 今日大面比昨日明显增加→退潮类。
+4. 热门股批量大跌/跌停→退潮；热门股涨停加速→主升加速。
+5. 拿不准选保守(混沌/修复)。
 
-【情绪节点规范】
-{spec}
-
-【竞价表历史节点标注（旧→新）】
+竞价表历史：
 {history}
 
-【近日盘面统计序列（旧→新，用于相对比较）】
+近日盘面（旧→新）：
 {recent}
 
-【今日盘面统计】
-今日日期：{today}
+今日{today}（{daban_constraint}）
 {stats}
+{compare}
 
-【热门股表现（同花顺热榜前10）】
+热门股：
 {hot}
 """
+
+
+def _daman_compare(hist_stats: pd.DataFrame, today_stats: dict) -> str:
+    """前日大面→今日大面对比，输出提示行。"""
+    if hist_stats.empty or not today_stats:
+        return ""
+    prev = hist_stats.iloc[-1]
+    prev_dm = int(prev["大面数"]) if pd.notna(prev["大面数"]) else 0
+    today_dm = int(today_stats.get("大面数", 0)) if today_stats.get("大面数") is not None else 0
+    if prev_dm == 0:
+        return f"前日大面0→今日大面{today_dm}"
+    chg = (today_dm - prev_dm) / prev_dm * 100
+    if chg < 0:
+        tag = "弱修复" if abs(chg) < 50 else ("中等修复" if abs(chg) < 70 else "强修复")
+        return f"前日大面{prev_dm}→今日大面{today_dm}，减少{abs(chg):.0f}%→{tag}"
+    elif chg > 0:
+        return f"前日大面{prev_dm}→今日大面{today_dm}，增加{chg:.0f}%→退潮"
+    return f"前日大面{prev_dm}→今日大面{today_dm}，持平"
 
 
 def ai_judge(force: bool = False) -> dict:
@@ -211,50 +256,63 @@ def ai_judge(force: bool = False) -> dict:
 
     if not cfg.QWEN_API_KEY:
         return {"error": "未配置 QWEN_API_KEY"}
-    spec = EMO_SPEC.read_text(encoding="utf-8") if EMO_SPEC.exists() else ""
     hist = load_auction_table()
     hist_lines = "\n".join(
-        f"{r['日期']} 指数[{r.get('指数', '')}] 节点[{r['节点']}] "
-        f"小票亏效[{r.get('小票亏效', '')}] 大票亏效[{r.get('大票亏效', '')}] "
-        f"一字[{r.get('一字', '')}] 断板[{r.get('断板', '')}]"
-        for _, r in hist.tail(40).iterrows()) or "（无历史标注）"
+        f"{r['日期']} {r['节点']} {r.get('指数', '')}"
+        for _, r in hist.tail(15).iterrows()) or "（无历史标注）"
     stats = market_stats()
     stats_lines = "\n".join(f"{k}：{v}" for k, v in stats.items()) or "（盘面数据不可用）"
+    _db = stats.get("打板大面数")
+    if _db is not None and _db >= 10:
+        _db_constr = f"打板大面{_db}个，禁强修复（上限中等修复）"
+    elif _db is not None:
+        _db_constr = f"打板大面{_db}个，无限制"
+    else:
+        _db_constr = "打板大面数据不可用"
     hist_stats = stats_history(10)
+    _db_col = "打板大面数" in hist_stats.columns
     recent_lines = "\n".join(
-        f"{r['日期']} 大面{r['大面数']} 跌停{r['跌停数']} 涨停{r['涨停数']} 涨超7%{r['涨超7数']}"
+        f"{r['日期']} 大面{r['大面数']} 跌停{r['跌停数']} 涨停{r['涨停数']}"
+        + (f" 打板大面{int(r['打板大面数'])}" if _db_col and pd.notna(r['打板大面数']) else "")
         for _, r in hist_stats.iterrows()) or "（无历史统计）"
     hot = hot_stock_stats()
     _hot_rows = []
-    for h in hot.get("hot_list", []):
+    for h in (hot.get("hot_list") or [])[:5]:
         p = h.get("涨跌幅")
         p_str = f"{p:+.2f}%" if pd.notna(p) else "-"
-        amt = h.get("成交额(亿)")
-        amt_str = f"{amt}亿" if pd.notna(amt) else "-"
-        _hot_rows.append(f"{h.get('排名', '')}. {h.get('名称', '')}({h.get('代码', '')}) "
-                         f"涨跌幅{p_str} 成交额{amt_str} 板块[{h.get('板块', '-')}]")
+        _hot_rows.append(f"{h.get('名称', '')} {p_str} [{h.get('板块', '-')}]")
     hot_lines = "\n".join(_hot_rows) or "（热榜不可用）"
     if hot.get("热门个股指数") is not None:
-        hot_lines = (f"热门个股指数（前10平均涨跌幅）：{hot['热门个股指数']:+.2f}% ｜ "
-                     f"大跌(≤-7%) {hot.get('热门股大跌数', 0)} · "
-                     f"跌停 {hot.get('热门股跌停数', 0)} · "
-                     f"涨停 {hot.get('热门股涨停数', 0)}\n" + hot_lines)
-    prompt = JUDGE_PROMPT.format(nodes="、".join(NODE_NAMES), spec=spec,
+        hot_lines = f"热指{hot['热门个股指数']:+.2f}%\n" + hot_lines
+    prompt = JUDGE_PROMPT.format(nodes="、".join(NODE_NAMES),
                                  history=hist_lines, recent=recent_lines,
-                                 today=today, stats=stats_lines, hot=hot_lines)
+                                 today=today, daban_constraint=_db_constr,
+                                 stats=stats_lines, hot=hot_lines,
+                                 compare=_daman_compare(hist_stats, stats))
     try:
         from openai import OpenAI
         client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
         resp = client.chat.completions.create(
-            model=cfg.QWEN_CHAT_MODEL,
+            model="qwen-plus",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1)
+            temperature=0.1, max_tokens=300)
         raw = resp.choices[0].message.content.strip()
         m = re.search(r"\{.*\}", raw, re.S)
         result = json.loads(m.group(0) if m else raw)
-    except Exception as e:
-        logger.error("AI 情绪节点判断失败：%s", e)
-        return {"error": str(e)}
+    except Exception:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
+            resp = client.chat.completions.create(
+                model=cfg.QWEN_CHAT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1, max_tokens=300)
+            raw = resp.choices[0].message.content.strip()
+            m = re.search(r"\{.*\}", raw, re.S)
+            result = json.loads(m.group(0) if m else raw)
+        except Exception as e:
+            logger.error("AI 情绪节点判断失败：%s", e)
+            return {"error": str(e)}
     result = {
         "node": str(result.get("node", "")).strip(),
         "reason": str(result.get("reason", "")).strip(),
@@ -263,6 +321,12 @@ def ai_judge(force: bool = False) -> dict:
         "prev_stats": hist_stats.iloc[-1].to_dict() if not hist_stats.empty else {},
         "time": datetime.now().strftime("%H:%M"),
     }
+    # 硬约束：打板大面≥10禁强修复（只有强修复有此限制，AI可能算错，代码兜底）
+    _db_val = stats.get("打板大面数")
+    _node = result["node"]
+    if _db_val is not None and _db_val >= 10 and _node == "强修复":
+        result["node"] = "中等修复"
+        result["reason"] = f"打板大面{_db_val}≥10，强修复不可→降中等修复；{result['reason']}"
     store[today] = result
     _save_predictions(store)
     return result

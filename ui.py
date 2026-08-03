@@ -433,13 +433,24 @@ if _feature == "指数择时":
         with st.spinner(f"已到尾盘 {en.JUDGE_TIME}，AI 自动判断今日情绪节点…"):
             en.ai_judge()
     _erec = en.load_predictions().get(_today)
-    _en1, _en2, _en3 = st.columns([1, 3.4, 1])
+    _rt_daban = en.daban_damian_count()
+    _en1, _en2, _en3, _en4 = st.columns([1, 1, 2.4, 1])
     with _en1:
         st.markdown(f'<div class="stat-box"><div class="label">今日情绪节点</div>'
                     f'<div class="val" style="color:{cfg.COLOR_STOCK};">'
                     f'{(_erec or {}).get("node") or "未判断"}</div></div>',
                     unsafe_allow_html=True)
     with _en2:
+        _daban_val = _rt_daban if _rt_daban is not None else \
+            (_erec or {}).get("stats", {}).get("打板大面数")
+        _daban_color = cfg.COLOR_DOWN if (_daban_val and _daban_val >= 10) else \
+            (cfg.COLOR_UP if _daban_val and _daban_val < 10 else cfg.COLOR_MUTED)
+        st.markdown(f'<div class="stat-box"><div class="label">打板大面</div>'
+                    f'<div class="val" style="color:{_daban_color};font-size:26px;">'
+                    f'{_daban_val if _daban_val is not None else "—"}</div>'
+                    f'<div class="label" style="margin-top:2px;">曾涨停回落&lt;5%</div></div>',
+                    unsafe_allow_html=True)
+    with _en3:
         _est = (_erec or {}).get("stats", {})
         _epv = (_erec or {}).get("prev_stats", {})
         if _est:
@@ -462,7 +473,7 @@ if _feature == "指数择时":
             st.markdown(f'<span class="chip">🎭 AI 依据: <span class="k">{_erec["reason"]}</span>'
                         f' ｜ {_erec.get("advice", "")}（{_erec.get("time", "")}）</span>',
                         unsafe_allow_html=True)
-    with _en3:
+    with _en4:
         if st.button("🎭 判断情绪节点", use_container_width=True):
             with st.spinner("AI 学习竞价表历史 + 统计当日盘面…"):
                 _er = en.ai_judge(force=True)
@@ -580,13 +591,59 @@ if _feature == "指数择时":
             prog.empty()
             st.rerun()
     else:
+        # 盘中自动刷新（60秒），非交易时段不自动刷新
+        import datetime as _dt
+        _now = _dt.datetime.now()
+        _is_trading = _now.weekday() < 5 and (
+            (_now.hour == 9 and _now.minute >= 25) or
+            (9 < _now.hour < 15) or
+            (_now.hour == 15 and _now.minute <= 5))
+        if _is_trading:
+            from streamlit_autorefresh import st_autorefresh
+            st_autorefresh(interval=60000, key="avg_price_auto")
+
+        # 每次加载都取最新实时均价（get_stock_spot 有60秒TTL缓存自动节流）
+        _rt = data.get_realtime_avg_price()
+        _rt_val = _rt.get("avg_price")
+        _today_str = time.strftime("%Y-%m-%d")
+        if _rt_val and (len(_avg) == 0 or str(_avg["日期"].iloc[-1]) != _today_str):
+            _prev_close = float(_avg["收盘"].iloc[-1]) if not _avg.empty else _rt_val
+            _today_row = pd.DataFrame([{
+                "日期": _today_str,
+                "开盘": round(_prev_close, 2),
+                "最高": round(max(_prev_close, _rt_val), 2),
+                "最低": round(min(_prev_close, _rt_val), 2),
+                "收盘": round(_rt_val, 2),
+            }])
+            _avg = pd.concat([_avg, _today_row], ignore_index=True)
+
         _marks = it.all_signals()
-        st.plotly_chart(_kline_fig(_avg,
-                                   f"全市场平均股价 日K（{len(_avg)}天 · 多空线=MA10"
-                                   f"{' · 多空转标记' if _marks else ''}）",
-                                   height=520, marks=_marks,
-                                   ma_lines=((10, "多空线", "#4dd0e1"),)),
-                        use_container_width=True, theme=None, config=_PLOTLY_CFG)
+        _ac1, _ac2 = st.columns([5, 1])
+        with _ac1:
+            st.plotly_chart(_kline_fig(_avg,
+                                       f"全市场平均股价 日K（{len(_avg)}天 · 多空线=MA10"
+                                       f"{' · 多空转标记' if _marks else ''}）",
+                                       height=520, marks=_marks,
+                                       ma_lines=((10, "多空线", "#4dd0e1"),)),
+                            use_container_width=True, theme=None, config=_PLOTLY_CFG)
+        with _ac2:
+            _rt_color = cfg.COLOR_STOCK if _rt_val else cfg.COLOR_MUTED
+            _prev_rt = float(_avg["收盘"].iloc[-2]) if len(_avg) >= 2 else None
+            _rt_pct = ((_rt_val / _prev_rt - 1) * 100) if (_rt_val and _prev_rt) else None
+            _pct_color = cfg.COLOR_UP if (_rt_pct and _rt_pct > 0) else (cfg.COLOR_DOWN if (_rt_pct and _rt_pct < 0) else cfg.COLOR_MUTED)
+            st.markdown(
+                f'<div class="stat-box" style="margin-top:60px;">'
+                f'<div class="label">{"🔴 实时" if _is_trading else "平均"}平均股价</div>'
+                f'<div class="val" style="color:{_rt_color};font-size:26px;">'
+                f'{f"{_rt_val:.3f}" if _rt_val else "—"}</div>'
+                + (f'<div class="val" style="color:{_pct_color};font-size:15px;">{_rt_pct:+.2f}%</div>' if _rt_pct is not None else "")
+                + f'<div class="label" style="margin-top:4px;">覆盖 {_rt.get("stock_count","—")} 只<br>{_rt.get("timestamp","")}</div>'
+                f'</div>',
+                unsafe_allow_html=True)
+            st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
+            if st.button("🔄 刷新均价", use_container_width=True):
+                data.clear_cache("get_stock_spot")
+                st.rerun()
 
     with st.expander("📖 中级周期规范（node_spec.md）"):
         _spec = cfg.DOCS_DIR / "node_spec.md"
@@ -694,10 +751,19 @@ elif _feature == "主线模式":
                     f'（B/D周期日不计入）{_gate_note}</div></div>', unsafe_allow_html=True)
         with _kc:
             # ── 成交前10指数 K线（同花顺883902，主线开启参考，缩小置右）────
-            st.markdown(
-                f'<span class="chip">📊 成交前10指数(同花顺883902): '
-                f'<span style="color:{_gcolor};font-weight:700;">上升趋势 {_gid}/{_gtot} 日</span></span>',
-                unsafe_allow_html=True)
+            _kc1, _kc2 = st.columns([4, 1])
+            with _kc1:
+                st.markdown(
+                    f'<span class="chip">📊 成交前10指数(同花顺883902): '
+                    f'<span style="color:{_gcolor};font-weight:700;">上升趋势 {_gid}/{_gtot} 日</span></span>',
+                    unsafe_allow_html=True)
+            with _kc2:
+                if st.button("🔄 刷新", key="refresh_ths_idx", use_container_width=True):
+                    data.clear_cache("get_ths_index_daily")
+                    with st.spinner("刷新成交前10指数…"):
+                        st.session_state["tm_res"] = tm.detect(str(_t_start), str(_t_end))
+                    st.session_state.pop("tm_ai", None)
+                    st.rerun()
             _idf = _tr.get("turnover_idx")
             if _idf is not None and not _idf.empty:
                 _idf = _idf.dropna(subset=["收盘"])
@@ -949,8 +1015,297 @@ elif _feature == "短线模式":
             st.markdown(_sspec.read_text(encoding="utf-8"))
 
 elif _feature == "个股模式":
-    placeholder("个股模式", "theme_stock_spec.md",
-                "个股买卖点与持仓管理（后续补充K线与个股详情）。")
+    from datetime import date, timedelta
+    import plotly.graph_objects as go
+    from src import single_stock as ss
+
+    st.markdown("### 🎯 个股模式（主线/短线/庄股 · AI判断买卖点）")
+
+    # 周期判断
+    _cyc = ss.current_cycle()
+    if _cyc == "D":
+        st.markdown(
+            f'<div class="stat-box" style="border-color:{cfg.COLOR_DOWN};">'
+            f'<div class="label">⚠️ 当前中级周期 D</div>'
+            f'<div class="val" style="color:{cfg.COLOR_DOWN};">D周期不弹个股 — 空仓为主</div>'
+            f'</div>', unsafe_allow_html=True)
+    else:
+        _cyc_color = cfg.COLOR_UP if _cyc in ("A", "B", "C") else cfg.COLOR_MUTED
+        st.markdown(
+            f'<div class="stat-box">'
+            f'<div class="label">当前中级周期 {_cyc or "未知"}</div>'
+            f'<div class="val" style="color:{_cyc_color};">'
+            f'{"✅ 可弹个股" if _cyc in ("A", "B", "C") else "待确认"}</div>'
+            f'</div>', unsafe_allow_html=True)
+
+    # 日期选择 + 运行按钮（单日，连板天梯仅支持30天内）
+    with st.form("ss_form", border=False):
+        _sc1, _sc2, _sc3 = st.columns([1.5, 1.2, 5])
+        with _sc1:
+            _ss_date = st.date_input("选择日期（30天内）",
+                                     value=date.today(),
+                                     min_value=date.today() - timedelta(days=29),
+                                     max_value=date.today())
+        with _sc2:
+            st.markdown('<div style="height:28px;"></div>', unsafe_allow_html=True)
+            _ss_go = st.form_submit_button("🔍 筛选+AI判断", use_container_width=True,
+                                          type="primary")
+        with _sc3:
+            st.markdown(
+                f'<div class="muted" style="padding-top:28px;">'
+                f'📅 {_ss_date} · 连板天梯仅支持30天内数据'
+                f'</div>', unsafe_allow_html=True)
+
+    if _ss_go or "ss_result" not in st.session_state:
+        with st.spinner("正在筛选庄股 + 主线/短线候选 + AI判断…"):
+            st.session_state["ss_result"] = ss.run(str(_ss_date))
+            st.session_state.pop("ss_intra_code", None)
+    _res = st.session_state.get("ss_result", {})
+
+    # AI 总结
+    _ai = _res.get("ai_result", {})
+    if _ai.get("summary"):
+        st.markdown(
+            f'<div class="stat-box" style="margin-bottom:6px;">'
+            f'<div class="label">🤖 AI 个股判断总结</div>'
+            f'<div style="color:{cfg.COLOR_TEXT};margin-top:4px;white-space:pre-wrap;">'
+            f'{_ai["summary"]}</div></div>', unsafe_allow_html=True)
+
+    # 三个子板块
+    _ss_tabs = st.tabs(["📈 主线模式个股", "⚡ 短线模式个股", "💰 庄股"])
+
+    # ── 主线模式个股 ──
+    with _ss_tabs[0]:
+        _ml_data = _res.get("mainline_data", {})
+        if _ml_data.get("error") == "need_cache":
+            st.warning("主线个股需先构建全市场数据缓存（约1-2分钟）。")
+            if st.button("🔄 构建缓存", key="ss_build"):
+                _prog = st.progress(0.0, text="构建全市场指标缓存…")
+
+                def _ss_bcb(done, total):
+                    _prog.progress(done / total, text=f"拉取历史 {done}/{total}")
+
+                data.build_metrics_cache(progress_cb=_ss_bcb)
+                _prog.empty()
+                st.session_state.pop("ss_result", None)
+                st.rerun()
+        elif _ml_data.get("has_mainline"):
+            st.markdown(
+                f'<span class="chip">主线: <span class="k">{_ml_data["board"]}</span>'
+                f' · {_ml_data["start"]}~{_ml_data["end"]}</span>',
+                unsafe_allow_html=True)
+            _ml_disp = _res.get("mainline_display")
+            if _ml_disp is not None and not _ml_disp.empty:
+                _core_codes = set(_ml_data.get("core_codes", []))
+                _follow_codes = set(_ml_data.get("follow_codes", []))
+                _core_df = _ml_disp[_ml_disp["代码"].isin(_core_codes)]
+                _follow_df = _ml_disp[_ml_disp["代码"].isin(_follow_codes)]
+                if not _core_df.empty:
+                    st.markdown("**核心容量个股：**")
+                    sortable_table(_core_df, pct_cols=("涨跌幅", "涨速"))
+                if not _follow_df.empty:
+                    st.markdown("**补涨前5：**")
+                    sortable_table(_follow_df, pct_cols=("涨跌幅", "涨速"))
+            else:
+                st.markdown('<div class="muted">（主线个股无实时数据）</div>',
+                            unsafe_allow_html=True)
+            _ai_ml = _ai.get("mainline", [])
+            if _ai_ml:
+                with st.expander("🤖 AI 主线个股判断", expanded=True):
+                    for _s in _ai_ml:
+                        _vc = (cfg.COLOR_UP if "可做" in _s.get("verdict", "")
+                               else cfg.COLOR_DOWN if "回避" in _s.get("verdict", "")
+                               else cfg.COLOR_MUTED)
+                        st.markdown(
+                            f'**<span class="stk">{_s.get("name", "")}</span>'
+                            f'({_s.get("code", "")})** — '
+                            f'<span style="color:{_vc};font-weight:600;">{_s.get("verdict", "")}</span>'
+                            f' [{_s.get("type", "")}]',
+                            unsafe_allow_html=True)
+                        st.markdown(
+                            f'<span class="chip">买: <span class="k">{_s.get("buy", "")}</span></span>'
+                            f'<span class="chip">卖: <span class="k">{_s.get("sell", "")}</span></span>',
+                            unsafe_allow_html=True)
+                        st.markdown(f'<div class="muted">{_s.get("reason", "")}</div>',
+                                    unsafe_allow_html=True)
+        else:
+            st.markdown(
+                '<div class="muted">（当前区间无主线，不弹主线个股。'
+                '主线一般在A/C周期出现。）</div>',
+                unsafe_allow_html=True)
+
+    # ── 短线模式个股 ──
+    with _ss_tabs[1]:
+        _st_data = _res.get("shortterm_data", {})
+        if _st_data.get("is_signal"):
+            st.markdown(
+                f'<span class="chip">起变信号: <span class="k">已出现 ✅</span></span>'
+                f'<span class="chip">📝 {_st_data.get("signal_reason", "")}</span>',
+                unsafe_allow_html=True)
+            for _m in _st_data.get("modes", []):
+                st.markdown(
+                    f'<div class="stat-box" style="margin-top:4px;">'
+                    f'<div class="label">🔥 {_m.get("mode", "")}</div>'
+                    f'<div style="font-size:14px;margin-top:2px;">'
+                    f'买: <span class="stk">{_m.get("buy_point", "")}</span> | '
+                    f'卖: <span class="stk">{_m.get("sell_point", "")}</span> | '
+                    f'仓位: <span class="stk">{_m.get("position", "")}</span>'
+                    f'</div></div>', unsafe_allow_html=True)
+            _st_disp = _res.get("shortterm_display")
+            if _st_disp is not None and not _st_disp.empty:
+                sortable_table(_st_disp, pct_cols=("涨跌幅", "涨速"))
+            else:
+                st.markdown('<div class="muted">（短线候选无实时数据）</div>',
+                            unsafe_allow_html=True)
+        else:
+            st.markdown(
+                f'<div class="muted">（今日无起变信号 — '
+                f'{_st_data.get("signal_reason", "")}）</div>',
+                unsafe_allow_html=True)
+        _ai_st = _ai.get("shortterm", [])
+        if _ai_st:
+            with st.expander("🤖 AI 短线个股判断", expanded=True):
+                for _s in _ai_st:
+                    _vc = (cfg.COLOR_UP if "可做" in _s.get("verdict", "")
+                           else cfg.COLOR_DOWN if "回避" in _s.get("verdict", "")
+                           else cfg.COLOR_MUTED)
+                    st.markdown(
+                        f'**<span class="stk">{_s.get("name", "")}</span>'
+                        f'({_s.get("code", "")})** — '
+                        f'<span style="color:{_vc};font-weight:600;">{_s.get("verdict", "")}</span>'
+                        f' [{_s.get("mode", "")}]',
+                        unsafe_allow_html=True)
+                    st.markdown(
+                        f'<span class="chip">买: <span class="k">{_s.get("buy", "")}</span></span>'
+                        f'<span class="chip">卖: <span class="k">{_s.get("sell", "")}</span></span>',
+                        unsafe_allow_html=True)
+                    st.markdown(f'<div class="muted">{_s.get("reason", "")}</div>',
+                                unsafe_allow_html=True)
+
+    # ── 庄股 ──
+    with _ss_tabs[2]:
+        st.markdown(
+            '<span class="chip">筛选: <span class="k">连续5日收盘&gt;MA5 · 自由流通&gt;30亿'
+            ' · 5日涨&gt;15% · 主板 · 30日涨&gt;40%</span></span>',
+            unsafe_allow_html=True)
+        _zg_df = _res.get("zhuanggu")
+        if _zg_df is not None and not _zg_df.empty:
+            st.markdown(f'<span class="chip">命中: <span class="k">{len(_zg_df)}只</span></span>',
+                        unsafe_allow_html=True)
+            _zg_show = _zg_df[[c for c in ss.DISPLAY_COLS if c in _zg_df.columns]]
+            sortable_table(_zg_show, pct_cols=("涨跌幅", "涨速"))
+        else:
+            st.markdown('<div class="muted">（无符合条件的庄股）</div>',
+                        unsafe_allow_html=True)
+        _ai_zg = _ai.get("zhuanggu", [])
+        if _ai_zg:
+            with st.expander("🤖 AI 庄股判断", expanded=True):
+                for _s in _ai_zg:
+                    _vc = (cfg.COLOR_UP if "可做" in _s.get("verdict", "")
+                           else cfg.COLOR_DOWN if "回避" in _s.get("verdict", "")
+                           else cfg.COLOR_MUTED)
+                    st.markdown(
+                        f'**<span class="stk">{_s.get("name", "")}</span>'
+                        f'({_s.get("code", "")})** — '
+                        f'<span style="color:{_vc};font-weight:600;">{_s.get("verdict", "")}</span>',
+                        unsafe_allow_html=True)
+                    st.markdown(
+                        f'<span class="chip">买: <span class="k">{_s.get("buy", "")}</span></span>'
+                        f'<span class="chip">卖: <span class="k">{_s.get("sell", "")}</span></span>'
+                        f'<span class="chip">⚠️ {_s.get("risk", "")}</span>',
+                        unsafe_allow_html=True)
+                    st.markdown(f'<div class="muted">{_s.get("reason", "")}</div>',
+                                unsafe_allow_html=True)
+
+    # ── 分时图 ──
+    _stock_pairs: list[tuple[str, str]] = []
+    for _df_key in ("zhuanggu", "mainline_display", "shortterm_display"):
+        _df = _res.get(_df_key)
+        if _df is not None and not _df.empty:
+            for _, _r in _df.iterrows():
+                _stock_pairs.append((str(_r["代码"]), str(_r.get("名称", ""))))
+    _stock_pairs = list(dict.fromkeys(_stock_pairs))
+    if _stock_pairs:
+        st.markdown("---")
+        st.markdown("##### 📈 点击个股查看分时图")
+        _npr = 6
+        for _rs in range(0, len(_stock_pairs), _npr):
+            _chunk = _stock_pairs[_rs:_rs + _npr]
+            _cols = st.columns(_npr)
+            for _j, (_code, _name) in enumerate(_chunk):
+                with _cols[_j]:
+                    _is_sel = st.session_state.get("ss_intra_code") == _code
+                    if st.button(_name, key=f"intra_btn_{_code}",
+                                 use_container_width=True,
+                                 type="primary" if _is_sel else "secondary"):
+                        st.session_state["ss_intra_code"] = _code
+        _sel_code = st.session_state.get("ss_intra_code")
+        if _sel_code:
+            _name_disp = next((_n for _c, _n in _stock_pairs
+                               if _c == _sel_code), _sel_code)
+            _hc, _tc, _rc = st.columns([1, 4, 1])
+            with _hc:
+                if st.button("✕ 关闭", key="intra_close",
+                             use_container_width=True):
+                    st.session_state.pop("ss_intra_code", None)
+            with _tc:
+                st.markdown(
+                    f'<div style="text-align:center;padding-top:6px">'
+                    f'<span class="stk">{_name_disp}</span> '
+                    f'<span class="muted">{_sel_code}</span></div>',
+                    unsafe_allow_html=True)
+            with _rc:
+                st.button("🔄 刷新", key="intra_refresh",
+                          use_container_width=True)
+            with st.spinner("加载分时数据…"):
+                _intra = ss.get_intraday(_sel_code)
+            if not _intra.empty:
+                from plotly.subplots import make_subplots
+                _fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                                     vertical_spacing=0.04,
+                                     row_heights=[0.65, 0.35])
+                _fig.add_trace(go.Scatter(
+                    x=_intra["时间"], y=_intra["价格"],
+                    mode="lines", name="价格",
+                    line=dict(color=cfg.COLOR_STOCK, width=1.2),
+                    showlegend=False), row=1, col=1)
+                if "均价" in _intra.columns:
+                    _fig.add_trace(go.Scatter(
+                        x=_intra["时间"], y=_intra["均价"],
+                        mode="lines", name="均价",
+                        line=dict(color=cfg.COLOR_MUTED, width=0.8,
+                                  dash="dash"),
+                        showlegend=False), row=1, col=1)
+                if "成交量" in _intra.columns:
+                    _prev = [_intra["价格"].iloc[0]] + list(
+                        _intra["价格"].iloc[:-1])
+                    _vcolors = [cfg.COLOR_UP if p >= pp else cfg.COLOR_DOWN
+                                for p, pp in zip(_intra["价格"], _prev)]
+                    _fig.add_trace(go.Bar(
+                        x=_intra["时间"], y=_intra["成交量"],
+                        name="量", marker=dict(color=_vcolors),
+                        showlegend=False), row=2, col=1)
+                _fig.update_layout(
+                    height=260, paper_bgcolor=cfg.COLOR_BG,
+                    plot_bgcolor=cfg.COLOR_PANEL,
+                    font=dict(color=cfg.COLOR_TEXT, size=10),
+                    margin=dict(l=42, r=8, t=4, b=4),
+                    showlegend=False)
+                _fig.update_xaxes(showticklabels=False, row=1, col=1)
+                _fig.update_xaxes(tickangle=0, dtick=30, row=2, col=1)
+                _fig.update_yaxes(gridcolor="#2a2a2a", row=1, col=1)
+                _fig.update_yaxes(gridcolor="#2a2a2a", row=2, col=1)
+                st.plotly_chart(_fig, use_container_width=True, theme=None)
+            else:
+                st.markdown(
+                    '<div class="muted">（无分时数据，可能非交易时段）</div>',
+                    unsafe_allow_html=True)
+
+    # 规范文档
+    with st.expander("📖 个股模式规范（single stock.md）"):
+        _sspec = cfg.DOCS_DIR / "single stock.md"
+        if _sspec.exists():
+            st.markdown(_sspec.read_text(encoding="utf-8"))
 
 elif _feature == "明日推演":
     placeholder("明日推演", "deduction_spec.md",

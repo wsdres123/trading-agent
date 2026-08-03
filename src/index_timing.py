@@ -17,6 +17,7 @@ import pandas as pd
 
 from config import settings as cfg
 from src import data
+from src.data import ttl_cache
 
 logger = logging.getLogger("index_timing")
 
@@ -61,8 +62,9 @@ def _save_ai_predictions(d: dict) -> None:
         logger.warning("写AI预判失败：%s", e)
 
 
+@ttl_cache(cfg.SPOT_TTL)
 def all_signals() -> dict:
-    """{日期: {signal, source}}：复盘表历史为准，AI 预判补充未复盘的日期。"""
+    """{日期: {signal, source}}：复盘表历史为准，AI 预判补充未复盘的日期，上穿多空线自动补充"转"。"""
     out = {}
     for d, p in load_ai_predictions().items():
         if p.get("signal") in SIGNAL_COLORS:
@@ -70,6 +72,22 @@ def all_signals() -> dict:
     hist = load_history_signals()
     for _, r in hist.iterrows():
         out[r["日期"]] = {"signal": r["信号"], "source": "复盘"}
+    # 平均股价收盘价上穿多空线（MA10）→ 自动补充"转"信号
+    try:
+        avg = avg_price_kline(days=400)
+        if not avg.empty and len(avg) >= 11:
+            avg = avg.reset_index(drop=True)
+            ma10 = avg["收盘"].rolling(10, min_periods=10).mean()
+            for i in range(1, len(avg)):
+                if not (pd.notna(ma10.iloc[i]) and pd.notna(ma10.iloc[i - 1])):
+                    continue
+                if (avg["收盘"].iloc[i - 1] <= ma10.iloc[i - 1]
+                        and avg["收盘"].iloc[i] > ma10.iloc[i]):
+                    d = str(avg["日期"].iloc[i])
+                    if d not in out:
+                        out[d] = {"signal": "转", "source": "上穿多空线"}
+    except Exception:
+        pass
     return out
 
 
@@ -132,37 +150,55 @@ def _index_features(days: int = 12) -> str:
     return "\n".join(lines)
 
 
-def _recent_review_rows(n: int = 25) -> str:
+def _recent_review_rows(n: int = 10) -> str:
     hist = load_history_signals()
     if hist.empty:
         return "（无复盘记录）"
     rows = hist.tail(n)
-    return "\n".join(f"{r['日期']} 指数择时={r['信号']} 中级周期={r['中级周期']} "
-                     f"情绪周期={r['情绪周期']} 指数形态={r['指数']}"
+    return "\n".join(f"{r['日期']} {r['信号']} {r['中级周期']} {r['情绪周期']}"
                      for _, r in rows.iterrows())
 
 
-JUDGE_PROMPT = """你是A股指数择时研究员。请依据下面的【中级周期规范】与【复盘表近况】，
-结合【上证指数近期量价】与【今日市场数据】，输出今日判断，只输出 JSON：
-{{"mid_cycle": "趋势A|龙头A|B|C|D", "signal": "多|空|转", "position": "仓位建议一句话", "reason": "判断依据，80字内"}}
+def _avg_price_status() -> str:
+    """平均股价与多空线(MA10)关系：当前价、MA10值、在上方/下方、是否刚上穿。"""
+    avg = avg_price_kline(days=20)
+    if avg.empty or len(avg) < 11:
+        return "（平均股价数据不足）"
+    avg = avg.reset_index(drop=True)
+    ma10 = avg["收盘"].rolling(10, min_periods=10).mean()
+    close = float(avg["收盘"].iloc[-1])
+    ma_val = ma10.iloc[-1]
+    if pd.isna(ma_val):
+        return "（多空线数据不足）"
+    ma_val = float(ma_val)
+    date = str(avg["日期"].iloc[-1])
+    pos = "上方" if close > ma_val else "下方"
+    cross = ""
+    if len(avg) >= 2 and pd.notna(ma10.iloc[-2]):
+        prev_above = float(avg["收盘"].iloc[-2]) > float(ma10.iloc[-2])
+        curr_above = close > ma_val
+        if not prev_above and curr_above:
+            cross = "，今日上穿多空线"
+        elif prev_above and not curr_above:
+            cross = "，今日下穿多空线"
+    return f"{date} 平均股价{close:.2f}，多空线(MA10){ma_val:.2f}，股价在多空线{pos}{cross}"
 
-判断要点：
-- mid_cycle 按规范识别当前所处中级周期（量能≥2.5万亿看趋势A/C；缩量阴跌看D；箱体震荡看B）。
-- signal 参考复盘表"指数择时"列的历史标注习惯来预判今天：多=看多，空=看空，转=转折/过渡。
-- 硬规则：空叠加D周期必须空仓；空叠加B周期只可小仓位。
-- 复盘表最近几天的标注具有很强的连续性参考价值，除非量价出现明显反转不要轻易跳变。
 
-【中级周期规范】
-{spec}
+JUDGE_PROMPT = """A股指数择时。只输出JSON，不要多余文字：
+{{"mid_cycle":"(从趋势A/龙头A/B/C/D中选一个)","signal":"多/空/转","position":"仓位一句话","reason":"依据40字内"}}
+规则：量能≥2.5万亿连阳→趋势A/C；缩量阴跌→D；箱体→B；空+D必须空仓；空+B小仓。
+signal延续复盘近期标注，除非量价明显反转。平均股价在多空线下方且未上穿时signal不能为转/多，应为空。
 
-【复盘表近况（旧→新）】
+复盘表近况：
 {review}
 
-【上证指数近期量价（旧→新）】
+上证近期K线：
 {kline}
 
-【今日市场数据】
-今日日期：{today}；全市场成交额：{turnover}万亿；上证今日涨跌幅：{today_pct}
+平均股价与多空线：
+{avg_status}
+
+今日{today} 成交额{turnover}万亿 涨跌{today_pct}
 """
 
 
@@ -176,28 +212,38 @@ def ai_judge(force: bool = False) -> dict:
     from openai import OpenAI
     if not cfg.QWEN_API_KEY:
         return {"error": "未配置 QWEN_API_KEY"}
-    spec = NODE_SPEC.read_text(encoding="utf-8") if NODE_SPEC.exists() else ""
     idx = data.get_index_daily("sh000001", days=3)
     today_pct = "-"
     if len(idx) >= 2:
         today_pct = f"{(idx['收盘'].iloc[-1] / idx['收盘'].iloc[-2] - 1) * 100:+.2f}%"
     turnover = market_turnover_wanyi()
     prompt = JUDGE_PROMPT.format(
-        spec=spec, review=_recent_review_rows(), kline=_index_features(),
+        review=_recent_review_rows(), kline=_index_features(),
+        avg_status=_avg_price_status(),
         today=today, turnover=turnover if turnover is not None else "未知",
         today_pct=today_pct)
     try:
         client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
         resp = client.chat.completions.create(
-            model=cfg.QWEN_CHAT_MODEL,
+            model="qwen-plus",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1)
+            temperature=0.1, max_tokens=300)
         raw = resp.choices[0].message.content.strip()
         m = re.search(r"\{.*\}", raw, re.S)
         result = json.loads(m.group(0) if m else raw)
-    except Exception as e:
-        logger.error("AI 择时判断失败：%s", e)
-        return {"error": str(e)}
+    except Exception:
+        try:
+            client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
+            resp = client.chat.completions.create(
+                model=cfg.QWEN_CHAT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1, max_tokens=300)
+            raw = resp.choices[0].message.content.strip()
+            m = re.search(r"\{.*\}", raw, re.S)
+            result = json.loads(m.group(0) if m else raw)
+        except Exception as e:
+            logger.error("AI 择时判断失败：%s", e)
+            return {"error": str(e)}
     result = {
         "mid_cycle": str(result.get("mid_cycle", "")).strip(),
         "signal": str(result.get("signal", "")).strip(),
@@ -223,11 +269,10 @@ def should_auto_judge() -> bool:
 
 
 # ── 平均股价日K ───────────────────────────────────────────────────────────
+@ttl_cache(cfg.SPOT_TTL)
 def avg_price_kline(days: int = 360) -> pd.DataFrame:
     """全市场逐日算术平均 OHLC。依赖 390 日版指标缓存（缺列则返回空表提示重建）。"""
     cache = data.load_metrics_cache()
-    if cache is None:
-        cache = data.load_metrics_cache(allow_stale=True)
     cols = ["日期", "开盘", "最高", "最低", "收盘"]
     if cache is None or not {"opens", "lows", "closes", "highs"}.issubset(cache.columns):
         return pd.DataFrame(columns=cols)

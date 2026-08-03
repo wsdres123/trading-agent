@@ -257,35 +257,27 @@ def get_ladder(date_str: str) -> pd.DataFrame:
 
 # ── 信号计算层 ─────────────────────────────────────────────────────────────
 def is_one_line_board(row) -> bool:
-    """是否一字板：首次封板时间<'09:30:00' AND 炸板次数==0 AND 换手率<1.5。
+    """是否一字板：封板时间<'09:30' AND 炸板次数==0。
 
-    股权变更票（涨停统计含特殊标注）不算一字板。
+    股权变更票不算一字板。
     """
     if isinstance(row, dict):
-        first_time = str(row.get("首次封板时间", ""))
+        first_time = str(row.get("首次封板时间") or row.get("封板时间") or "")
         breaks = row.get("炸板次数", 1)
-        turnover = row.get("换手率", 99)
-        stat = str(row.get("涨停统计", ""))
+        stat = str(row.get("涨停统计") or row.get("涨停原因") or "")
     else:
-        first_time = str(row.get("首次封板时间", ""))
+        first_time = str(row.get("首次封板时间", "") or row.get("封板时间", ""))
         breaks = row.get("炸板次数", 1)
-        turnover = row.get("换手率", 99)
-        stat = str(row.get("涨停统计", ""))
+        stat = str(row.get("涨停统计", "") or row.get("涨停原因", ""))
 
-    # 股权变更票不算一字
     if "股权" in stat or "变更" in stat or "更名" in stat:
         return False
     try:
         breaks = int(breaks) if pd.notna(breaks) else 1
     except (ValueError, TypeError):
         breaks = 1
-    try:
-        turnover = float(turnover) if pd.notna(turnover) else 99.0
-    except (ValueError, TypeError):
-        turnover = 99.0
-    # 首封时间格式可能是 "09:25:00" 或 "092500"
     ft = re.sub(r"[:\-]", "", first_time)
-    return first_time and ft < "093000" and breaks == 0 and turnover < 1.5
+    return bool(first_time) and bool(ft) and ft < "093000" and breaks == 0
 
 
 def calc_space(zt_df: pd.DataFrame) -> int:
@@ -366,20 +358,20 @@ def build_evidence(date_str: str) -> dict:
     ladder = get_ladder(date_str)
     space = calc_space(zt) if not zt.empty else calc_space(ladder)
 
-    # 高度板（最大连板数的票）；akshare有明细可判一字板，否则用THS数据
+    # 高度板（最大连板数的票）
     high_board = None
-    high_is_one_line = None  # None=未知（无akshare明细）
+    high_is_one_line = None
     if space > 0:
         if not zt.empty:
             high_rows = zt[zt["连板数"] == space]
             if not high_rows.empty:
                 high_board = high_rows.iloc[0]
                 high_is_one_line = is_one_line_board(high_board)
-        elif not ladder.empty:
+        if high_board is None and not ladder.empty:
             high_rows = ladder[ladder["连板数"] == space]
             if not high_rows.empty:
                 high_board = high_rows.iloc[0]
-                high_is_one_line = None
+                high_is_one_line = is_one_line_board(high_board)
 
     lianban = calc_lianban_signal("883958")
     weipan = calc_weipan_safe("883418")
@@ -425,7 +417,7 @@ AI_PROMPT = """你是A股短线情绪交易员，擅长连板梯队与情绪周�
 
 起变信号标准（需综合判断，不要求全部硬性满足，你可以根据经验加权判断）：
 1. 连板空间 > 4板（空间压制被打破）
-2. 高度板非一字板（股权变更票不算一字板）
+2. 高度板如果是一字板（封板<09:30且炸板=0），该票不能作为候选，但起变信号仍可触发——看连板天梯中是否有非一字板票出现分歧转一致
 3. 883958（昨日连板指数）连阴3天后跳空高开拉红（连板溢价率高）
 4. 883418（微盘股指数）跌幅不大于-1%（微盘股不深跌）
 5. 行情种类偏向接力，情绪红色1天
@@ -439,6 +431,12 @@ AI_PROMPT = """你是A股短线情绪交易员，擅长连板梯队与情绪周�
    买点：有一字做首个换手打板  卖点：次日一字封单减少则走  仓位：3层以下
 4. 补涨：高度龙头断板当天或爆量当天（龙头不能跌超-5%），做1进2不同板块或同板块首板补涨
    买点：龙头断板当天做补涨  卖点：次日强转弱则走  仓位：3层
+
+候选股选择规则（重要）：
+- 一字板（封板时间<09:30且炸板次数=0）不能作为候选股，一字板是资金锁仓不是换手博弈
+- 分歧转一致模式：从连板天梯中找炸板次数>0的票（说明盘中分歧后回封=分歧转一致），优先高连板数
+- 突破空间压制模式：找站上新高度的票，但必须是非一字板（有换手有炸板=真博弈）
+- 候选股必须来自连板天梯数据，给出代码和名称
 
 请严格输出以下JSON（不要输出JSON以外的任何内容）：
 {{
@@ -535,7 +533,6 @@ def ai_judge(evidence: dict) -> dict:
         lb = evidence.get("lianban_883958", {})
         wp = evidence.get("weipan_883418", {})
         is_sig = (evidence["space"] > 4
-                  and evidence.get("high_board_is_one_line") is not True
                   and lb.get("triggered", False)
                   and wp.get("safe", True))
         triggered_modes = []
@@ -566,8 +563,8 @@ def ai_judge(evidence: dict) -> dict:
     client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
     prompt = AI_PROMPT.format(spec=spec, bidding=bidding, evidence=ev_text)
 
-    # 快速模型优先（qwen-turbo ~2s），失败回退常规模型
-    for _model in ("qwen-turbo", cfg.QWEN_CHAT_MODEL):
+    # qwen-plus 优先（快且质量好），失败回退3.7-max
+    for _model in ("qwen-plus", cfg.QWEN_CHAT_MODEL):
         try:
             resp = client.chat.completions.create(
                 model=_model,
