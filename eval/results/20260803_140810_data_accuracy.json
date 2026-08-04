@@ -1,0 +1,27 @@
+{
+  "pass": 4,
+  "fail": 1,
+  "details": [
+    {
+      "test": "全市场快照字段完整性",
+      "status": "pass"
+    },
+    {
+      "test": "指数涨跌幅合理性",
+      "status": "pass"
+    },
+    {
+      "test": "日K线连续性",
+      "status": "fail",
+      "error": "日K线间隔异常(>5天): max gap=6.0"
+    },
+    {
+      "test": "热榜数据可用性",
+      "status": "pass"
+    },
+    {
+      "test": "Redis缓存读写",
+      "status": "pass"
+    }
+  ]
+}

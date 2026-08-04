@@ -1,26 +1,29 @@
-"""知识库加载与 RAG 检索。
+"""知识库加载与 RAG 检索（BM25 + 向量混合检索）。
 
 扫描 knowledge/ 与 docs/，分块后用 Qwen text-embedding-v3 向量化，
-缓存到 .knowledge_index/。search() 返回与查询最相关的 top-k 文本块。
+缓存到 .knowledge_index/。search() 用 RRF 融合 BM25 与向量余弦相似度，
+返回与查询最相关的 top-k 文本块。
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
+import re
 from pathlib import Path
 from typing import List
 
 import numpy as np
 from openai import OpenAI
+from rank_bm25 import BM25Okapi
 
 from config import settings as cfg
 
 logger = logging.getLogger("knowledge")
 
-CHUNK_SIZE = 400      # 每块约 400 字
-CHUNK_OVERLAP = 60
-BATCH = 10            # Qwen text-embedding-v3 单批上限 10
+CHUNK_SIZE = 800      # 每块约 800 字（交易知识段落较长，400 字易截断语义）
+CHUNK_OVERLAP = 200   # 重叠 200 字，保留上下文连续性
+BATCH = 10            # DashScope text-embedding-v3 单批上限 10
 EMBED_DIM = 1024
 
 _client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL) if cfg.QWEN_API_KEY else None
@@ -143,6 +146,11 @@ def _hash(text: str) -> str:
 _INDEX: dict | None = None
 
 
+def _tokenize(text: str) -> List[str]:
+    """简易中文分词：按非字母数字字符切分，单字作为 token（覆盖中文术语检索）。"""
+    return re.findall(r"[a-zA-Z0-9]+|[\u4e00-\u9fff]", text.lower())
+
+
 def _build_index() -> dict:
     global _INDEX
     if _INDEX is not None:
@@ -154,14 +162,19 @@ def _build_index() -> dict:
         try:
             cached = json.loads(pkl.read_text(encoding="utf-8"))
             if cached.get("chunks") == chunks and "vecs" in cached:
-                _INDEX = {"chunks": chunks, "vecs": np.array(cached["vecs"], dtype="float32")}
+                vecs = np.array(cached["vecs"], dtype="float32")
+                tokenized = [_tokenize(c) for c in chunks]
+                bm25 = BM25Okapi(tokenized) if chunks else None
+                _INDEX = {"chunks": chunks, "vecs": vecs, "bm25": bm25}
                 logger.info("知识索引命中缓存：%d 块", len(chunks))
                 return _INDEX
         except Exception:
             pass
     logger.info("重建知识索引：%d 块", len(chunks))
     vecs = _embed(chunks) if chunks else np.zeros((0, EMBED_DIM), dtype="float32")
-    _INDEX = {"chunks": chunks, "vecs": vecs}
+    tokenized = [_tokenize(c) for c in chunks]
+    bm25 = BM25Okapi(tokenized) if chunks else None
+    _INDEX = {"chunks": chunks, "vecs": vecs, "bm25": bm25}
     try:
         pkl.write_text(json.dumps({"chunks": chunks, "vecs": vecs.tolist()}), encoding="utf-8")
     except Exception as e:
@@ -169,18 +182,34 @@ def _build_index() -> dict:
     return _INDEX
 
 
+def _rrf_fusion(vec_scores: np.ndarray, bm25_scores: np.ndarray,
+                k: int = 60) -> np.ndarray:
+    """Reciprocal Rank Fusion：将两路排名合并为统一分数。k 为平滑常数。"""
+    vec_rank = np.argsort(-vec_scores).argsort() + 1   # 1-based rank
+    bm25_rank = np.argsort(-bm25_scores).argsort() + 1
+    return 1.0 / (k + vec_rank) + 1.0 / (k + bm25_rank)
+
+
 def search(query: str, k: int = 5) -> List[str]:
-    """检索与 query 最相关的 top-k 知识块。"""
+    """BM25 + 向量余弦混合检索，RRF 融合排名，返回 top-k 知识块。"""
     idx = _build_index()
-    chunks, vecs = idx["chunks"], idx["vecs"]
+    chunks, vecs, bm25 = idx["chunks"], idx["vecs"], idx["bm25"]
     if not chunks or _client is None:
         return []
+
+    # 向量余弦相似度
     qv = _embed([query])[0]
     norms = np.linalg.norm(vecs, axis=1) * (np.linalg.norm(qv) + 1e-9)
-    sims = (vecs @ qv) / (norms + 1e-9)
-    k = min(k, len(chunks))
-    top = np.argsort(sims)[-k:][::-1]
-    return [chunks[i] for i in top if sims[i] > 0.1]
+    vec_sims = (vecs @ qv) / (norms + 1e-9)
+
+    # BM25 分数
+    tokens = _tokenize(query)
+    bm25_sims = bm25.get_scores(tokens) if bm25 else np.zeros(len(chunks))
+
+    # RRF 融合
+    rrf_scores = _rrf_fusion(vec_sims, bm25_sims)
+    top = np.argsort(rrf_scores)[-k:][::-1]
+    return [chunks[i] for i in top if rrf_scores[i] > 0]
 
 
 def status() -> dict:

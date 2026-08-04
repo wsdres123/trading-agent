@@ -19,8 +19,599 @@
   "mid_cycle": "B",
   "signal": "空",
   "position": "空信号叠加B周期 → 只可小仓位参与",
-  "reason": "市场缩量至1.86万亿且指数箱体震荡，符合B周期特征；近期连续调整无明显反转信号，延续看空判断，严控仓位。",
-  "time": "13:48",
-  "turnover_wanyi": 1.86
+  "reason": "指数箱体震荡且量能不足2.5万亿，维持B周期。今日收跌且前两日择时均为空，未见量价反转信号，维持空信号，依规小仓位防守。",
+  "time": "22:04",
+  "turnover_wanyi": 2.36
+ },
+ "2026-07-31": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空信号叠加B周期 → 只可小仓位参与",
+  "reason": "量能达标但平均股价未上穿多空线，延续空信号",
+  "time": "22:45",
+  "turnover_wanyi": 2.56
+ },
+ "2026-08-01": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空信号叠加D周期 → 必须空仓",
+  "reason": "量能达标但平均股价仍在多空线下方，未上穿，延续空信号",
+  "time": "07:17",
+  "turnover_wanyi": 2.56
+ },
+ "2026-08-03": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空信号叠加B周期 → 只可小仓位参与",
+  "reason": "平均股价仍在多空线下方，量能2.01万亿＜2.5万亿，无连阳反转信号",
+  "time": "16:55",
+  "turnover_wanyi": 2.01
+ },
+ "2026-03-30": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "缩量阴跌，空+D必须空仓",
+  "source": "backtest"
+ },
+ "2026-03-31": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "缩量阴跌，空+D必须空仓",
+  "source": "backtest"
+ },
+ "2026-04-01": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，混沌期，信号为空",
+  "source": "backtest"
+ },
+ "2026-04-02": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，混沌期，空仓",
+  "source": "backtest"
+ },
+ "2026-04-03": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓或小仓",
+  "reason": "量能不足，震荡偏空",
+  "source": "backtest"
+ },
+ "2026-04-07": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明，保持谨慎",
+  "source": "backtest"
+ },
+ "2026-04-08": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明，空+D需空仓",
+  "source": "backtest"
+ },
+ "2026-04-09": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，混沌期，信号为空",
+  "source": "backtest"
+ },
+ "2026-04-10": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，混沌期，信号为空",
+  "source": "backtest"
+ },
+ "2026-04-13": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓或小仓",
+  "reason": "量能不足，混沌期，信号未反转",
+  "source": "backtest"
+ },
+ "2026-04-14": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中等仓位",
+  "reason": "量能充足，趋势向上，题材活跃",
+  "source": "backtest"
+ },
+ "2026-04-15": {
+  "mid_cycle": "趋势A",
+  "signal": "多",
+  "position": "保持中等仓位",
+  "reason": "量能稳定，趋势向上，信号延续",
+  "source": "backtest"
+ },
+ "2026-04-16": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "中等仓位",
+  "reason": "量能充足，趋势向上，题材活跃",
+  "source": "backtest"
+ },
+ "2026-04-17": {
+  "mid_cycle": "A",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，信号延续空",
+  "source": "backtest"
+ },
+ "2026-04-20": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "中高仓位",
+  "reason": "主升期共振，量价配合良好",
+  "source": "backtest"
+ },
+ "2026-04-21": {
+  "mid_cycle": "趋势A",
+  "signal": "多",
+  "position": "重仓",
+  "reason": "量能稳定，趋势向上，题材活跃",
+  "source": "backtest"
+ },
+ "2026-04-22": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中等仓位",
+  "reason": "量能充足，趋势向上，信号延续多",
+  "source": "backtest"
+ },
+ "2026-04-23": {
+  "mid_cycle": "A",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，背离且大周期混沌",
+  "source": "backtest"
+ },
+ "2026-04-24": {
+  "mid_cycle": "趋势A",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，背离且大周期退潮期",
+  "source": "backtest"
+ },
+ "2026-04-27": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中等仓位，关注强势题材动向",
+  "reason": "量能稳定，趋势延续，强势题材支撑",
+  "source": "backtest"
+ },
+ "2026-04-28": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "平均股价未上穿多空线",
+  "source": "backtest"
+ },
+ "2026-04-29": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中等仓位，关注趋势延续性",
+  "reason": "量能充足，趋势A首修期，指数共振上行",
+  "source": "backtest"
+ },
+ "2026-04-30": {
+  "mid_cycle": "B",
+  "signal": "多",
+  "position": "小仓",
+  "reason": "箱体震荡，量能不足，信号延续",
+  "source": "backtest"
+ },
+ "2026-05-06": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "满仓",
+  "reason": "量能充足，趋势明确，首修期强势",
+  "source": "backtest"
+ },
+ "2026-05-07": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "重仓",
+  "reason": "量能充足，趋势明确，主升期",
+  "source": "backtest"
+ },
+ "2026-05-08": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中高仓位",
+  "reason": "量能充足，趋势向上，题材活跃",
+  "source": "backtest"
+ },
+ "2026-05-11": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中等仓位",
+  "reason": "量能充足，趋势向上，首修期特征明显",
+  "source": "backtest"
+ },
+ "2026-05-12": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中等仓位，关注强势题材动向",
+  "reason": "量能充足，趋势向上，题材活跃",
+  "source": "backtest"
+ },
+ "2026-05-13": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "中等仓位",
+  "reason": "量能充足，趋势明确，题材活跃",
+  "source": "backtest"
+ },
+ "2026-05-14": {
+  "mid_cycle": "A",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势破位，空+D空仓",
+  "source": "backtest"
+ },
+ "2026-05-15": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明",
+  "source": "backtest"
+ },
+ "2026-05-18": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，信号为空",
+  "source": "backtest"
+ },
+ "2026-05-19": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "中等仓位",
+  "reason": "量能稳定，趋势A首修期，题材活跃",
+  "source": "backtest"
+ },
+ "2026-05-20": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "平均股价未上穿多空线",
+  "source": "backtest"
+ },
+ "2026-05-21": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势退潮，平均股价未上穿",
+  "source": "backtest"
+ },
+ "2026-05-22": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "中等仓位",
+  "reason": "量能回升，趋势A延续",
+  "source": "backtest"
+ },
+ "2026-05-25": {
+  "mid_cycle": "B",
+  "signal": "多",
+  "position": "小仓",
+  "reason": "混沌期，量能不足，信号多",
+  "source": "backtest"
+ },
+ "2026-05-26": {
+  "mid_cycle": "B",
+  "signal": "多",
+  "position": "小仓",
+  "reason": "混沌期，量能不足，信号延续",
+  "source": "backtest"
+ },
+ "2026-05-27": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明，空+D需空仓",
+  "source": "backtest"
+ },
+ "2026-05-28": {
+  "mid_cycle": "B",
+  "signal": "多",
+  "position": "保持中等仓位",
+  "reason": "震荡修复期，量能稳定",
+  "source": "backtest"
+ },
+ "2026-05-29": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明",
+  "source": "backtest"
+ },
+ "2026-06-01": {
+  "mid_cycle": "B",
+  "signal": "转",
+  "position": "小仓",
+  "reason": "量能不足，信号延续但需谨慎",
+  "source": "backtest"
+ },
+ "2026-06-02": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，信号延续空",
+  "source": "backtest"
+ },
+ "2026-06-03": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，信号延续空",
+  "source": "backtest"
+ },
+ "2026-06-04": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，混沌期空仓",
+  "source": "backtest"
+ },
+ "2026-06-05": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，混沌期延续",
+  "source": "backtest"
+ },
+ "2026-06-08": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "小仓",
+  "reason": "量能不足，混沌期延续",
+  "source": "backtest"
+ },
+ "2026-06-09": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "小仓",
+  "reason": "量能不足，空+ B 小仓",
+  "source": "backtest"
+ },
+ "2026-06-10": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓或小仓",
+  "reason": "量能不足，趋势未明，空+ B 小仓",
+  "source": "backtest"
+ },
+ "2026-06-11": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，混沌期，信号延续空",
+  "source": "backtest"
+ },
+ "2026-06-12": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "保持空仓或小仓",
+  "reason": "量能不足，处于混沌期",
+  "source": "backtest"
+ },
+ "2026-06-15": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明",
+  "source": "backtest"
+ },
+ "2026-06-16": {
+  "mid_cycle": "趋势A",
+  "signal": "转",
+  "position": "小仓",
+  "reason": "量能回升，信号转多，主升期",
+  "source": "backtest"
+ },
+ "2026-06-17": {
+  "mid_cycle": "趋势A",
+  "signal": "转",
+  "position": "中高仓位",
+  "reason": "量能回升，指数共振上攻",
+  "source": "backtest"
+ },
+ "2026-06-18": {
+  "mid_cycle": "趋势A",
+  "signal": "转",
+  "position": "保持中等仓位",
+  "reason": "量能充足，趋势明确，信号延续",
+  "source": "backtest"
+ },
+ "2026-06-22": {
+  "mid_cycle": "趋势A",
+  "signal": "多",
+  "position": "中高仓位",
+  "reason": "量能回升，主升期延续",
+  "source": "backtest"
+ },
+ "2026-06-23": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，平均股价未上穿",
+  "source": "backtest"
+ },
+ "2026-06-24": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "重仓",
+  "reason": "量能充足，趋势向上，主升期",
+  "source": "backtest"
+ },
+ "2026-06-25": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "重仓",
+  "reason": "量能稳定，趋势明确，主升期延续",
+  "source": "backtest"
+ },
+ "2026-06-26": {
+  "mid_cycle": "A",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，背离且大周期过渡期",
+  "source": "backtest"
+ },
+ "2026-06-29": {
+  "mid_cycle": "趋势A",
+  "signal": "多",
+  "position": "保持中高仓位",
+  "reason": "量能充足，主升期延续",
+  "source": "backtest"
+ },
+ "2026-06-30": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中等仓位",
+  "reason": "趋势A主升期，量能充足，题材强势。",
+  "source": "backtest"
+ },
+ "2026-07-01": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "中仓",
+  "reason": "量能充足，趋势A主升期",
+  "source": "backtest"
+ },
+ "2026-07-02": {
+  "mid_cycle": "A",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足且趋势退潮",
+  "source": "backtest"
+ },
+ "2026-07-03": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，退潮期",
+  "source": "backtest"
+ },
+ "2026-07-06": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，退潮期，空+D空仓",
+  "source": "backtest"
+ },
+ "2026-07-07": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，退潮期，信号为空",
+  "source": "backtest"
+ },
+ "2026-07-08": {
+  "mid_cycle": "B",
+  "signal": "转",
+  "position": "小仓",
+  "reason": "量能不足，箱体震荡",
+  "source": "backtest"
+ },
+ "2026-07-09": {
+  "mid_cycle": "A",
+  "signal": "多",
+  "position": "保持中高仓位",
+  "reason": "止跌阳，首修期，量能回升",
+  "source": "backtest"
+ },
+ "2026-07-10": {
+  "mid_cycle": "A",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明",
+  "source": "backtest"
+ },
+ "2026-07-13": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "退潮期缩量阴跌",
+  "source": "backtest"
+ },
+ "2026-07-14": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未改",
+  "source": "backtest"
+ },
+ "2026-07-15": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "缩量阴跌，空+D必须空仓",
+  "source": "backtest"
+ },
+ "2026-07-16": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，退潮期，空+D必须空仓",
+  "source": "backtest"
+ },
+ "2026-07-17": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "缩量阴跌，空+D必须空仓",
+  "source": "backtest"
+ },
+ "2026-07-20": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，退潮期，信号延续空",
+  "source": "backtest"
+ },
+ "2026-07-21": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明",
+  "source": "backtest"
+ },
+ "2026-07-22": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，缩量阴跌，空+D必须空仓",
+  "source": "backtest"
+ },
+ "2026-07-23": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，空+D必须空仓",
+  "source": "backtest"
+ },
+ "2026-07-24": {
+  "mid_cycle": "D",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，趋势未明，空+D空仓",
+  "source": "backtest"
+ },
+ "2026-07-27": {
+  "mid_cycle": "B",
+  "signal": "空",
+  "position": "空仓",
+  "reason": "量能不足，箱体震荡",
+  "source": "backtest"
  }
 }

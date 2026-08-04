@@ -12,6 +12,7 @@ from typing import Any
 import pandas as pd
 
 from src import data
+from src.ts_store import get_store as _get_ts_store
 
 logger = logging.getLogger("market_tools")
 
@@ -183,6 +184,36 @@ def get_market_overview() -> str:
     )
 
 
+def get_index_kline_analysis(symbol: str = "sh000001", days: int = 60) -> str:
+    """指数K线技术分析：收盘价、MA均线、涨幅、百日高低、波动率（DuckDB向量化SQL）。"""
+    ts = _get_ts_store()
+    stats = ts.get_index_stats(symbol)
+    if not stats or stats.get("close") is None:
+        return f"获取 {ts.get_index_name(symbol)}({symbol}) K线数据失败或数据不足。"
+    name = ts.get_index_name(symbol)
+    parts = [f"{name}({symbol}) 最新收盘 {stats['close']:.2f} ({stats['date']})"]
+    ma_items = []
+    for period, key in [(5, "ma5"), (10, "ma10"), (20, "ma20"), (60, "ma60")]:
+        v = stats.get(key)
+        if v is not None:
+            ma_items.append(f"MA{period}={v:.2f}")
+    if ma_items:
+        parts.append(" ".join(ma_items))
+    ret_items = []
+    if stats.get("ret_5d") is not None:
+        ret_items.append(f"5日涨幅 {_fmt_pct(stats['ret_5d'])}")
+    if stats.get("ret_20d") is not None:
+        ret_items.append(f"20日涨幅 {_fmt_pct(stats['ret_20d'])}")
+    if ret_items:
+        parts.append(" ".join(ret_items))
+    if stats.get("high_100d") and stats.get("low_100d"):
+        parts.append(f"近100日最高 {stats['high_100d']:.2f} 最低 {stats['low_100d']:.2f}")
+    vol = ts.calc_volatility(symbol, days=min(days, 60))
+    if vol is not None:
+        parts.append(f"{min(days, 60)}日年化波动率 {vol:.1f}%")
+    return "；".join(parts)
+
+
 # ── 工具 schema（OpenAI function-calling 格式）──────────────────────────────
 TOOL_SCHEMAS = [
     {"type": "function", "function": {
@@ -214,6 +245,13 @@ TOOL_SCHEMAS = [
         "name": "get_market_overview",
         "description": "获取大盘总览：主要指数、全市场涨跌家数、涨停/跌停数、两市总成交额。",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {
+        "name": "get_index_kline_analysis",
+        "description": "获取指数K线技术分析：收盘价、MA5/10/20/60均线、5日/20日涨幅、近100日高低点、波动率。基于DuckDB向量化SQL计算。",
+        "parameters": {"type": "object", "properties": {
+            "symbol": {"type": "string", "description": "指数代码：sh000001(上证)/sz399001(深证)/sz399006(创业板)/sh000688(科创50)"},
+            "days": {"type": "integer", "description": "分析周期（天数），默认60"}},
+            "required": ["symbol"]}}},
 ]
 
 _DISPATCH = {
@@ -222,6 +260,7 @@ _DISPATCH = {
     "get_stock_history": get_stock_history,
     "get_sector_quote": get_sector_quote,
     "get_market_overview": get_market_overview,
+    "get_index_kline_analysis": get_index_kline_analysis,
 }
 
 

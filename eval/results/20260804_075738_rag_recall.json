@@ -1,0 +1,119 @@
+{
+  "total": 108,
+  "correct": 97,
+  "recall_accuracy": 0.8981,
+  "pass": 97,
+  "fail": 11,
+  "details": [
+    {
+      "query": "D周期为什么必须空仓",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "D周期",
+        "缩量阴跌",
+        "无赚钱效应"
+      ]
+    },
+    {
+      "query": "B周期为什么不做弱转强",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "B周期",
+        "不做",
+        "题材轮动"
+      ]
+    },
+    {
+      "query": "连板空间压制是什么意思",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "空间",
+        "压制",
+        "5板"
+      ]
+    },
+    {
+      "query": "中级周期有哪几种分类",
+      "status": "fail",
+      "recall": 0.4,
+      "missed": [
+        "趋势A",
+        "龙头A",
+        "D"
+      ]
+    },
+    {
+      "query": "连板指数883958是什么",
+      "status": "fail",
+      "recall": 0.33,
+      "missed": [
+        "883958",
+        "溢价率"
+      ]
+    },
+    {
+      "query": "短线龙头怕什么情况",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "怕",
+        "指数大涨",
+        "大跌"
+      ]
+    },
+    {
+      "query": "主线ETF什么时候买",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "ETF",
+        "创新高",
+        "前3天"
+      ]
+    },
+    {
+      "query": "短线模式的仓位控制",
+      "status": "fail",
+      "recall": 0.0,
+      "missed": [
+        "仓位",
+        "3层",
+        "惩罚机制"
+      ]
+    },
+    {
+      "query": "指数择时两个转一个多代表什么",
+      "status": "fail",
+      "recall": 0.0,
+      "missed": [
+        "俩转一多",
+        "趋势A",
+        "C周期",
+        "行情"
+      ]
+    },
+    {
+      "query": "空叠加B周期能操作吗",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "B周期",
+        "小仓位",
+        "仓位"
+      ]
+    },
+    {
+      "query": "情绪节点判断的时间点",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "14:57",
+        "尾盘",
+        "每日"
+      ]
+    }
+  ]
+}

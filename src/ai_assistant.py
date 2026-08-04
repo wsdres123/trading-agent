@@ -2,6 +2,7 @@
 
 - chat(): RAG 检索交易系统知识 + 按需调用行情工具(指数/个股/历史/板块/大盘)，
   既能回答屠龙表/周期/心态类问题，也能回答"今天上证涨多少"等实时数据问题。
+- chat_stream(): 流式输出，配合 st.write_stream() 降低感知延迟。
 - parse_filter_conditions(): 自然语言 → 结构化 JSON 条件；失败回退关键字识别。
 """
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import List
+from typing import Generator, List
 
 from openai import OpenAI
 
@@ -20,9 +21,10 @@ logger = logging.getLogger("ai_assistant")
 
 _client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL) if cfg.QWEN_API_KEY else None
 
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 3
 
-SYSTEM_PROMPT = """你是「劫财AI交易」的专属助手，服务一位 A 股短线/趋势交易者。回答分两类处理：
+# ── 固定前缀（Prompt Caching 友好，每次调用相同前缀命中缓存）─────────────
+_SYSTEM_PREFIX = """你是「劫财AI交易」的专属助手，服务一位 A 股短线/趋势交易者。回答分两类处理：
 
 1. 交易系统/规则/周期/心态类问题（如趋势A周期、主线筛选、屠龙表、空仓纪律）：
    严格依据下方【知识库片段】回答；知识库未覆盖则如实说明，不要编造交易规则。
@@ -32,8 +34,9 @@ SYSTEM_PROMPT = """你是「劫财AI交易」的专属助手，服务一位 A �
 
 风格：简洁、要点化、可操作；回答行情务必给出具体数字与涨跌幅。若用户问个股筛选，
 可建议其使用「个股分组筛选」功能。工具返回的数据即视为权威，不要凭空臆测数值。
-【知识库片段】
-{context}"""
+"""
+
+SYSTEM_PROMPT = _SYSTEM_PREFIX + "【知识库片段】\n{context}"
 
 FILTER_SCHEMA_INSTRUCTIONS = """把用户对个股筛选的自然语言描述解析成 JSON，字段如下，只输出 JSON：
 {
@@ -86,9 +89,8 @@ def _ensure_client():
         raise RuntimeError("未配置 QWEN_API_KEY，AI 助手不可用。请在 .env 设置 DASHSCOPE_API_KEY。")
 
 
-def chat(question: str, history: List[dict] | None = None) -> str:
-    """RAG + 实时行情工具的问答。history 为 [{role,user/assistant, content}]。"""
-    _ensure_client()
+def _build_messages(question: str, history: List[dict] | None) -> list:
+    """构建消息列表：固定前缀走 Prompt Caching，动态 RAG 上下文追加。"""
     try:
         ctx_chunks = knowledge.search(question, k=5)
     except Exception as e:
@@ -100,18 +102,71 @@ def chat(question: str, history: List[dict] | None = None) -> str:
         if h.get("role") in ("user", "assistant") and h.get("content"):
             messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": question})
+    return messages
 
+
+def _run_tool_rounds(messages: list) -> str:
+    """执行工具调用轮次，返回最终文本。提前终止：连续2轮未产生工具调用即退出。"""
+    unused_rounds = 0
+    for _ in range(MAX_TOOL_ROUNDS):
+        resp = _client.chat.completions.create(
+            model=cfg.QWEN_PLUS_MODEL, messages=messages,
+            tools=market_tools.TOOL_SCHEMAS, tool_choice="auto",
+            temperature=0.4,
+            extra_body={"enable_thinking": False},
+        )
+        msg = resp.choices[0].message
+        if not msg.tool_calls:
+            if unused_rounds >= 1:
+                return (msg.content or "").strip()
+            unused_rounds += 1
+            return (msg.content or "").strip()
+        unused_rounds = 0
+        messages.append({
+            "role": "assistant",
+            "content": msg.content or "",
+            "tool_calls": [{
+                "id": tc.id, "type": "function",
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+            } for tc in msg.tool_calls],
+        })
+        for tc in msg.tool_calls:
+            result = market_tools.execute(tc.function.name, tc.function.arguments)
+            logger.info("工具调用 %s(%s) → %s", tc.function.name, tc.function.arguments, result[:120])
+            messages.append({
+                "role": "tool", "tool_call_id": tc.id,
+                "name": tc.function.name, "content": result,
+            })
+    return "（工具调用轮次超限，请简化问题后重试。）"
+
+
+def chat(question: str, history: List[dict] | None = None) -> str:
+    """RAG + 实时行情工具的问答（同步，返回完整文本）。"""
+    _ensure_client()
+    messages = _build_messages(question, history)
+    try:
+        return _run_tool_rounds(messages)
+    except Exception as e:
+        logger.error("Qwen 调用失败：%s", e)
+        return f"AI 暂时不可用：{e}"
+
+
+def chat_stream(question: str, history: List[dict] | None = None) -> Generator[str, None, None]:
+    """流式问答：先执行工具调用轮次（非流式），最终回答用流式输出。
+    配合 st.write_stream() 使用，用户 1-2 秒内可见首字。"""
+    _ensure_client()
+    messages = _build_messages(question, history)
     try:
         for _ in range(MAX_TOOL_ROUNDS):
             resp = _client.chat.completions.create(
-                model=cfg.QWEN_CHAT_MODEL, messages=messages,
+                model=cfg.QWEN_PLUS_MODEL, messages=messages,
                 tools=market_tools.TOOL_SCHEMAS, tool_choice="auto",
                 temperature=0.4,
+                extra_body={"enable_thinking": False},
             )
             msg = resp.choices[0].message
             if not msg.tool_calls:
-                return (msg.content or "").strip()
-            # 把助手消息（含 tool_calls）原样回填，再追加各工具结果
+                break
             messages.append({
                 "role": "assistant",
                 "content": msg.content or "",
@@ -127,10 +182,23 @@ def chat(question: str, history: List[dict] | None = None) -> str:
                     "role": "tool", "tool_call_id": tc.id,
                     "name": tc.function.name, "content": result,
                 })
-        return "（工具调用轮次超限，请简化问题后重试。）"
+        else:
+            yield "（工具调用轮次超限，请简化问题后重试。）"
+            return
+        # 最终回答走流式
+        stream = _client.chat.completions.create(
+            model=cfg.QWEN_PLUS_MODEL, messages=messages,
+            temperature=0.4,
+            stream=True,
+            extra_body={"enable_thinking": False},
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                yield delta.content
     except Exception as e:
-        logger.error("Qwen 调用失败：%s", e)
-        return f"AI 暂时不可用：{e}"
+        logger.error("Qwen 流式调用失败：%s", e)
+        yield f"AI 暂时不可用：{e}"
 
 
 def parse_filter_conditions(text: str) -> dict:
@@ -141,12 +209,13 @@ def parse_filter_conditions(text: str) -> dict:
     _ensure_client()
     try:
         resp = _client.chat.completions.create(
-            model=cfg.QWEN_CHAT_MODEL,
+            model=cfg.QWEN_TURBO_MODEL,
             messages=[
                 {"role": "system", "content": FILTER_SCHEMA_INSTRUCTIONS},
                 {"role": "user", "content": text},
             ],
             temperature=0.0,
+            extra_body={"enable_thinking": False},
         )
         raw = resp.choices[0].message.content.strip()
         raw = _extract_json(raw)

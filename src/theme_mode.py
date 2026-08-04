@@ -400,11 +400,12 @@ def ai_analyze(result: dict) -> str:
         from openai import OpenAI
         client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
         resp = client.chat.completions.create(
-            model=cfg.QWEN_CHAT_MODEL,
+            model=cfg.QWEN_PLUS_MODEL,
             messages=[{"role": "user", "content": AI_PROMPT.format(
                 start=result.get("start", ""), end=result.get("end", ""),
                 spec=spec, result="\n".join(lines))}],
-            temperature=0.2)
+            temperature=0.2,
+            extra_body={"enable_thinking": False})
         return resp.choices[0].message.content.strip()
     except Exception as e:
         logger.error("AI 主线判读失败：%s", e)

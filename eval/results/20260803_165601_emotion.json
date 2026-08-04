@@ -1,0 +1,669 @@
+{
+  "total": 424,
+  "matched": 103,
+  "correct": 31,
+  "wrong": 72,
+  "pass": 31,
+  "fail": 72,
+  "node_distribution": {
+    "修复--中等": 66,
+    "退潮": 65,
+    "日内分歧转一致": 36,
+    "混沌": 33,
+    "修复--弱": 28,
+    "修复--强": 25,
+    "混沌分歧": 25,
+    "冰点": 20,
+    "主升--分歧": 18,
+    "主升--高潮": 11,
+    "反弹加速转衰竭": 10,
+    "主升--加速": 9,
+    "退潮加速": 8,
+    "退潮转衰竭": 7,
+    "加速": 7,
+    "主升--延续": 7,
+    "主升--确认": 6,
+    "加速转衰竭": 6,
+    "反弹加速": 4,
+    "高潮": 3,
+    "龙头确认": 3,
+    "短线情绪确认": 3,
+    "冰点转折": 3,
+    "小退潮": 3,
+    "修复延续": 3,
+    "反弹第一天": 2,
+    "日内分歧未转一致": 2,
+    "修复--加速": 2,
+    "癫狂": 1,
+    "高潮,主升--确认": 1,
+    "加速,主升--确认": 1,
+    "退潮中继": 1,
+    "修复--高潮": 1,
+    "退潮,日内分歧转一致": 1,
+    "主升-加速转衰竭": 1,
+    "修复后反杀": 1,
+    "修复高潮": 1
+  },
+  "details": [
+    {
+      "date": "2026-02-13",
+      "expected": "退潮",
+      "ai": "退潮",
+      "status": "pass"
+    },
+    {
+      "date": "2026-02-24",
+      "expected": "退潮",
+      "ai": "退潮加速",
+      "status": "pass"
+    },
+    {
+      "date": "2026-02-25",
+      "expected": "修复--中等",
+      "ai": "修复--弱",
+      "status": "fail"
+    },
+    {
+      "date": "2026-02-26",
+      "expected": "龙头确认",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-02-27",
+      "expected": "加速",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-02",
+      "expected": "主升--分歧",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-03",
+      "expected": "冰点",
+      "ai": "退潮加速",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-04",
+      "expected": "退潮",
+      "ai": "退潮",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-05",
+      "expected": "修复--中等",
+      "ai": "修复--弱",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-06",
+      "expected": "修复延续",
+      "ai": "修复--中等",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-09",
+      "expected": "日内分歧转一致",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-10",
+      "expected": "混沌分歧",
+      "ai": "日内分歧转一致",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-11",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-12",
+      "expected": "日内分歧转一致",
+      "ai": "修复--弱",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-13",
+      "expected": "退潮",
+      "ai": "退潮",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-16",
+      "expected": "混沌分歧",
+      "ai": "修复--中等",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-17",
+      "expected": "修复--弱",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-18",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-19",
+      "expected": "混沌分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-20",
+      "expected": "混沌分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-23",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-24",
+      "expected": "修复--强",
+      "ai": "修复--强",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-25",
+      "expected": "主升--加速",
+      "ai": "修复--中等",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-26",
+      "expected": "主升--分歧",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-03-27",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-30",
+      "expected": "小退潮",
+      "ai": "退潮",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-31",
+      "expected": "修复--弱",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-01",
+      "expected": "混沌",
+      "ai": "修复--中等",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-02",
+      "expected": "混沌",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-03",
+      "expected": "混沌分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-07",
+      "expected": "修复--中等",
+      "ai": "修复--强",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-08",
+      "expected": "修复延续",
+      "ai": "主升--加速",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-09",
+      "expected": "混沌分歧",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-10",
+      "expected": "修复--弱",
+      "ai": "主升--分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-13",
+      "expected": "修复--弱",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-14",
+      "expected": "修复--强",
+      "ai": "修复--弱",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-15",
+      "expected": "加速转衰竭",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-16",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-17",
+      "expected": "日内分歧转一致",
+      "ai": "主升--延续",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-20",
+      "expected": "主升--加速",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-21",
+      "expected": "退潮",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-22",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-23",
+      "expected": "混沌分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-24",
+      "expected": "混沌分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-27",
+      "expected": "修复--弱",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-28",
+      "expected": "混沌",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-29",
+      "expected": "修复--中等",
+      "ai": "修复--强",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-30",
+      "expected": "混沌",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-06",
+      "expected": "修复--强",
+      "ai": "修复--强",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-07",
+      "expected": "日内分歧转一致",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-08",
+      "expected": "主升--分歧",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-11",
+      "expected": "修复--中等",
+      "ai": "主升--分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-12",
+      "expected": "日内分歧转一致",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-13",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-14",
+      "expected": "退潮",
+      "ai": "退潮",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-15",
+      "expected": "修复--中等",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-18",
+      "expected": "混沌",
+      "ai": "主升--分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-19",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-20",
+      "expected": "混沌分歧",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-21",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-22",
+      "expected": "修复--中等",
+      "ai": "修复--强",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-25",
+      "expected": "修复延续",
+      "ai": "混沌",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-26",
+      "expected": "日内分歧转一致",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-27",
+      "expected": "混沌分歧",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-28",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-29",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-01",
+      "expected": "修复--弱",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-02",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-03",
+      "expected": "主升--确认",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-04",
+      "expected": "混沌",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-05",
+      "expected": "混沌",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-08",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-09",
+      "expected": "修复--中等",
+      "ai": "修复--强",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-10",
+      "expected": "混沌分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-11",
+      "expected": "混沌分歧",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-12",
+      "expected": "修复--弱",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-15",
+      "expected": "修复--中等",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-16",
+      "expected": "日内分歧转一致",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-17",
+      "expected": "日内分歧转一致",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-18",
+      "expected": "主升--延续",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-22",
+      "expected": "主升--高潮",
+      "ai": "主升--确认",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-23",
+      "expected": "主升--分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-24",
+      "expected": "修复--强",
+      "ai": "修复--弱",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-25",
+      "expected": "主升--延续",
+      "ai": "主升--分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-26",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-29",
+      "expected": "修复--中等",
+      "ai": "主升--延续",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-30",
+      "expected": "主升--延续",
+      "ai": "修复--中等",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-01",
+      "expected": "加速转衰竭",
+      "ai": "主升--延续",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-02",
+      "expected": "退潮",
+      "ai": "退潮加速",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-03",
+      "expected": "混沌",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-06",
+      "expected": "混沌分歧",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-07",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-08",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-09",
+      "expected": "修复--强",
+      "ai": "修复--中等",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-10",
+      "expected": "加速转衰竭",
+      "ai": "混沌分歧",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-13",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-14",
+      "expected": "修复--中等",
+      "ai": "修复--中等",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-15",
+      "expected": "混沌",
+      "ai": "混沌分歧",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-16",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-17",
+      "expected": "冰点",
+      "ai": "退潮",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-29",
+      "expected": "修复--弱",
+      "ai": "弱修复",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-30",
+      "expected": "冰点",
+      "ai": "冰点",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-31",
+      "expected": "修复--中等",
+      "ai": "中等修复",
+      "status": "pass"
+    }
+  ],
+  "accuracy": 0.30097087378640774,
+  "accuracy_note": "AI缓存匹配 103/424 天，准确率 30.1%（目标 60%）。覆盖天数随每日运行自动增长。"
+}

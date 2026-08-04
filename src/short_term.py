@@ -25,6 +25,26 @@ logger = logging.getLogger("short_term")
 
 SHORT_SPEC = cfg.DOCS_DIR / "Short-term.md"
 BIDDING_CSV = cfg.KNOWLEDGE_DIR / "屠龙表 - 竞价表.csv"
+SIGNAL_STORE = cfg.DATA_DIR / "short_term_signal.json"
+
+
+def _load_signal_state() -> dict:
+    """读取缓存的起变信号状态。"""
+    try:
+        if SIGNAL_STORE.exists():
+            return json.loads(SIGNAL_STORE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _save_signal_state(state: dict) -> None:
+    """保存起变信号状态到 .data/short_term_signal.json。"""
+    SIGNAL_STORE.parent.mkdir(parents=True, exist_ok=True)
+    SIGNAL_STORE.write_text(
+        json.dumps(state, ensure_ascii=False, indent=1),
+        encoding="utf-8",
+    )
 
 # 4 种短线模式定义（来自 Short-term.md + 屠龙表-短线模式.csv）
 MODES_DEF = [
@@ -610,8 +630,8 @@ def scan_signals(code: str = "883958", days: int = 120) -> list[dict]:
 
 
 # ── 入口函数 ───────────────────────────────────────────────────────────────
-def detect(date_str: str) -> dict:
-    """短线模式主入口。
+def _detect_raw(date_str: str) -> dict:
+    """短线模式原始判断（无去重）。
 
     1. build_evidence(date_str) — 收集规则证据
     2. ai_judge(evidence) — 模型判断起变信号
@@ -628,3 +648,51 @@ def detect(date_str: str) -> dict:
         "ladder_df": ladder,
         "scan_marks": scan_marks,
     }
+
+
+def detect(date_str: str) -> dict:
+    """短线模式主入口（带去重）。
+
+    起变信号一旦触发，在同一883958周期内不重复出现。
+    当883958经历新一轮"连阴→跳空高开拉红"后周期重置。
+    """
+    result = _detect_raw(date_str)
+    ai_result = result.get("ai_result", {})
+    evidence = result.get("evidence", {})
+
+    if not ai_result.get("is_signal"):
+        return result
+
+    state = _load_signal_state()
+    cached_date = state.get("signal_date", "")
+
+    if not cached_date:
+        lb = evidence.get("lianban_883958", {})
+        lb_date = ""
+        if lb.get("triggered") and lb.get("klines"):
+            lb_date = str(lb["klines"][-1]["日期"])
+        _save_signal_state({"signal_date": date_str, "lianban_trigger_date": lb_date})
+        return result
+
+    # 回测历史日期（早于或等于已缓存日期）不应用去重
+    if date_str <= cached_date:
+        return result
+
+    lb = evidence.get("lianban_883958", {})
+    current_lb = ""
+    if lb.get("triggered") and lb.get("klines"):
+        current_lb = str(lb["klines"][-1]["日期"])
+    cached_lb = state.get("lianban_trigger_date", "")
+
+    if current_lb and current_lb != cached_lb:
+        _save_signal_state({"signal_date": date_str, "lianban_trigger_date": current_lb})
+        return result
+
+    ai_result["is_signal"] = False
+    ai_result["signal_reason"] = f"已于 {cached_date} 起变"
+    ai_result["modes"] = []
+    ai_result["summary"] = (
+        f"起变信号已于 {cached_date} 触发，当前仍处于同一周期，"
+        f"等待883958连板指数新一轮连阴→跳空高开拉红后再关注。"
+    )
+    return result

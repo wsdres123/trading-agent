@@ -1,0 +1,708 @@
+{
+  "total": 86,
+  "matched_signal": 86,
+  "correct_signal": 58,
+  "matched_cycle": 86,
+  "correct_cycle": 47,
+  "pass": 105,
+  "fail": 67,
+  "signal_distribution": {
+    "空": 38,
+    "多": 26,
+    "转": 22
+  },
+  "details": [
+    {
+      "date": "2026-03-30",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "龙头A",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-03-31",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-01",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-02",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-03",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-07",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-08",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "B",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-09",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-10",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-13",
+      "expected_signal": "多",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "B",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-14",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-15",
+      "expected_signal": "转",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "趋势A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-16",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-17",
+      "expected_signal": "多",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-20",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-21",
+      "expected_signal": "转",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "趋势A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-22",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-23",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-24",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "趋势A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-04-27",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "B",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-28",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-29",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-04-30",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-06",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-07",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-08",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-11",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-12",
+      "expected_signal": "转",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-13",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-14",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-05-15",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-18",
+      "expected_signal": "多",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-19",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "B",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-20",
+      "expected_signal": "多",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-21",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-22",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "B",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-25",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-26",
+      "expected_signal": "转",
+      "ai_signal": "多",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-27",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-28",
+      "expected_signal": "转",
+      "ai_signal": "多",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-05-29",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-01",
+      "expected_signal": "空",
+      "ai_signal": "转",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-02",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-03",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-04",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-05",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-08",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-09",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-10",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-11",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-12",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-15",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "B",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-16",
+      "expected_signal": "转",
+      "ai_signal": "转",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "趋势A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-17",
+      "expected_signal": "转",
+      "ai_signal": "转",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "趋势A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-18",
+      "expected_signal": "多",
+      "ai_signal": "转",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "趋势A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-22",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "趋势A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-23",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "B",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-24",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-25",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-26",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-06-29",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "趋势A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-06-30",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-01",
+      "expected_signal": "多",
+      "ai_signal": "多",
+      "expected_cycle": "趋势A",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-02",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-03",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-06",
+      "expected_signal": "转",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "B",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-07",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-08",
+      "expected_signal": "空",
+      "ai_signal": "转",
+      "expected_cycle": "D",
+      "ai_cycle": "B",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-09",
+      "expected_signal": "空",
+      "ai_signal": "多",
+      "expected_cycle": "D",
+      "ai_cycle": "A",
+      "status": "fail"
+    },
+    {
+      "date": "2026-07-10",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "A",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-13",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-14",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-15",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-16",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-17",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-20",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-21",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-22",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-23",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-24",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "D",
+      "ai_cycle": "D",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-27",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-28",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-29",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-30",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-31",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-08-03",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    }
+  ],
+  "accuracy": 0.6104651162790697,
+  "signal_accuracy": 0.6744186046511628,
+  "cycle_accuracy": 0.5465116279069767,
+  "note": "AI缓存匹配 86/86 天。信号准确率 67.4%(58/86)，周期准确率 54.7%(47/86)。"
+}

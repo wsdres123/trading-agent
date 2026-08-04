@@ -147,9 +147,10 @@ def ai_deduce(force: bool = False) -> dict:
         from openai import OpenAI
         client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
         resp = client.chat.completions.create(
-            model=cfg.QWEN_CHAT_MODEL,
+            model=cfg.QWEN_PLUS_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.2)
+            temperature=0.2,
+            extra_body={"enable_thinking": False})
         raw = resp.choices[0].message.content.strip()
         m = re.search(r"\{.*\}", raw, re.S)
         result = json.loads(m.group(0) if m else raw)

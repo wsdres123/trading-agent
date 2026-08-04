@@ -53,8 +53,21 @@ def _pre_close(code: str) -> float:
         return 0.0
 
 
+def _fmt_time(t: str) -> str:
+    """将 'HHMM' 转为 'HH:MM'，其他格式原样返回。"""
+    t = str(t).strip()
+    if len(t) == 4 and t.isdigit():
+        return f"{t[:2]}:{t[2:]}"
+    return t
+
+
 def get_intraday(code: str) -> pd.DataFrame:
-    """获取个股当日分时数据（分钟价格 + 均价线 + 涨幅 + 分时量）。"""
+    """获取个股当日分时数据（分钟价格 + 均价线 + 涨幅 + 分时量）。
+
+    - 时间格式统一为 HH:MM
+    - 仅保留交易时段 09:30–15:00，裁掉盘后数据
+    - 午休时段 11:30–13:00 插入 NaN 行，保持 x 轴连续
+    """
     session = data._sina_session()
     sym = data._sina_symbol(code)
     try:
@@ -69,7 +82,7 @@ def get_intraday(code: str) -> pd.DataFrame:
         for line in raw:
             parts = line.split()
             if len(parts) >= 2:
-                row = {"时间": parts[0], "价格": float(parts[1])}
+                row = {"时间": _fmt_time(parts[0]), "价格": float(parts[1])}
                 if len(parts) >= 4:
                     row["累计量"] = float(parts[2])
                     row["累计额"] = float(parts[3])
@@ -77,19 +90,40 @@ def get_intraday(code: str) -> pd.DataFrame:
         df = pd.DataFrame(rows)
         if df.empty:
             return pd.DataFrame(columns=["时间", "价格", "均价", "涨幅", "成交量"])
+
+        # 裁掉 15:00 之后的盘后数据
+        df = df[df["时间"] <= "15:00"].copy()
+
         if "累计量" in df.columns:
-            df["成交量"] = df["累计量"].diff().fillna(df["累计量"]).astype(int)
+            df["成交量"] = df["累计量"].diff().fillna(df["累计量"])
+            # 午后第一分钟 diff 为负或零（上午末累计量延续），修正为 0
+            df.loc[df["成交量"] < 0, "成交量"] = 0
+            df["成交量"] = df["成交量"].astype(int)
         if "累计额" in df.columns and "累计量" in df.columns:
             mask = df["累计量"] > 0
             df.loc[mask, "均价"] = (df.loc[mask, "累计额"] /
-                                 df.loc[mask, "累计量"] / 100).round(2)
+                                    df.loc[mask, "累计量"] / 100).round(2)
         else:
             df["均价"] = df["价格"].expanding().mean().round(2)
         if pre_close:
             df["涨幅"] = ((df["价格"] / pre_close - 1) * 100).round(2)
-        return df[["时间", "价格", "均价", "涨幅", "成交量"]
-                 if "成交量" in df.columns else
-                 ["时间", "价格", "均价", "涨幅"]]
+            df["昨收"] = pre_close
+
+        # 插入午休空行（11:31–12:59），让 x 轴视觉上有午休断开
+        lunch_times = [f"{h:02d}:{m:02d}"
+                       for h in range(11, 13)
+                       for m in range(60)
+                       if f"{h:02d}:{m:02d}" > "11:30" and f"{h:02d}:{m:02d}" < "13:00"]
+        if lunch_times and "11:30" in df["时间"].values and "13:00" in df["时间"].values:
+            gap = pd.DataFrame({"时间": lunch_times})
+            df = pd.concat([df, gap], ignore_index=True).sort_values("时间").reset_index(drop=True)
+
+        cols = ["时间", "价格", "均价", "涨幅"]
+        if "成交量" in df.columns:
+            cols.append("成交量")
+        if "昨收" in df.columns:
+            cols.append("昨收")
+        return df[cols]
     except Exception as e:
         logger.warning("分时数据获取失败 %s: %s", code, e)
         return pd.DataFrame(columns=["时间", "价格", "均价", "涨幅", "成交量"])

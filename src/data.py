@@ -49,30 +49,8 @@ def retry(retries: int = 4, base: float = 1.5):
     return deco
 
 
-# ── 简易 TTL 缓存（进程内）────────────────────────────────────────────────
-_CACHE: dict[str, tuple[float, object]] = {}
-
-
-def ttl_cache(ttl: float):
-    def deco(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            key = f"{fn.__name__}:{args}:{sorted(kwargs.items())}"
-            now = time.time()
-            hit = _CACHE.get(key)
-            if hit and now - hit[0] < ttl:
-                return hit[1]
-            val = fn(*args, **kwargs)
-            _CACHE[key] = (now, val)
-            return val
-        return wrapper
-    return deco
-
-
-def clear_cache(prefix: str = "") -> None:
-    """清除内存 TTL 缓存（prefix 限定函数名前缀，空=全部）。"""
-    for k in [k for k in _CACHE if k.startswith(prefix)]:
-        _CACHE.pop(k, None)
+# ── Redis TTL 缓存（Redis 优先，内存兜底）─────────────────────────────────
+from src.redis_cache import ttl_cache, clear_cache  # noqa: E402
 
 
 def _need_akshare():
@@ -145,7 +123,7 @@ def get_stock_spot_fast(max_workers: int = 16) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
-@ttl_cache(cfg.SPOT_TTL)
+@ttl_cache(cfg.SPOT_TTL, l1_ttl=cfg.L1_TTL_SPOT)
 def get_stock_spot() -> pd.DataFrame:
     """全 A 实时快照。腾讯批量首选（约2s），东财/新浪兜底。"""
     try:
@@ -337,7 +315,7 @@ def _sina_symbol(code: str) -> str:
     return "sz" + code
 
 
-@ttl_cache(cfg.SPOT_TTL)
+@ttl_cache(cfg.SPOT_TTL, l1_ttl=cfg.L1_TTL_SPOT)
 def get_stock_quote_fast(code: str) -> dict:
     """单只个股实时行情（新浪，毫秒级）。失败返回 {}。"""
     code = str(code).strip().zfill(6)
@@ -534,11 +512,20 @@ INDEX_KLINE_SYMBOLS = {"上证指数": "sh000001", "深证成指": "sz399001",
                        "创业板指": "sz399006", "科创50": "sh000688"}
 
 
-@ttl_cache(cfg.SPOT_TTL)
+@ttl_cache(cfg.SPOT_TTL, l1_ttl=cfg.L1_TTL_KLINE)
 def get_index_daily(symbol: str = "sh000001", days: int = 380) -> pd.DataFrame:
-    """指数日K（新浪，OHLCV），盘中用腾讯实时补当日未收盘bar；60秒缓存实时刷新。"""
+    """指数日K（新浪，OHLCV），盘中用腾讯实时补当日未收盘bar。
+    缓存链: L1(15s) → Redis(60s) → ts_store(本地parquet) → HTTP。"""
     import requests
+    from src.ts_store import get_store
     cols = ["日期", "开盘", "最高", "最低", "收盘", "成交量"]
+    ts = get_store()
+    local_df = ts.load_index_daily(symbol, days)
+    if local_df is not None:
+        today = datetime.now().strftime("%Y-%m-%d")
+        last_date = str(local_df["日期"].iloc[-1]).strip()
+        if last_date >= today:
+            return local_df
     try:
         s = _sina_session()
         r = s.get(_SINA_KLINE_URL, timeout=8, params={
@@ -550,9 +537,11 @@ def get_index_daily(symbol: str = "sh000001", days: int = 380) -> pd.DataFrame:
         } for x in arr])
     except Exception as e:
         logger.warning("指数日K %s 失败：%s", symbol, e)
+        if local_df is not None:
+            return local_df
         return _empty(cols)
     if df.empty:
-        return _empty(cols)
+        return local_df if local_df is not None else _empty(cols)
     # 盘中：新浪日K可能缺当日bar或数值滞后，用腾讯实时行情补/刷新
     try:
         today = datetime.now().strftime("%Y-%m-%d")
@@ -572,22 +561,38 @@ def get_index_daily(symbol: str = "sh000001", days: int = 380) -> pd.DataFrame:
                     df = pd.concat([df, pd.DataFrame([bar])], ignore_index=True)
     except Exception as e:
         logger.debug("补当日指数bar失败：%s", e)
-    return df.tail(days).reset_index(drop=True)
+    result = df.tail(days).reset_index(drop=True)
+    ts.save_index_daily(symbol, result)
+    return result
 
 
-@ttl_cache(cfg.SPOT_TTL)
+@ttl_cache(cfg.SPOT_TTL, l1_ttl=cfg.L1_TTL_KLINE)
 def get_ths_index_daily(code: str = "883902", days: int = 200) -> pd.DataFrame:
-    """同花顺指数日K（如 883902 昨日成交前十）。接口 d.10jqka.com.cn/v6/line/bk_<code>/01/last.js。"""
+    """同花顺指数日K（如 883902 昨日成交前十）。
+    缓存链: L1(15s) → Redis(60s) → ts_store(本地parquet) → HTTP。"""
     import json as _json
     import re as _re
+    from src.ts_store import get_store
     cols = ["日期", "开盘", "最高", "最低", "收盘", "成交量"]
+    ts = get_store()
+    local_df = ts.load_ths_index(code, days)
+    if local_df is not None:
+        from datetime import timedelta
+        today = datetime.now().date()
+        last_date = str(local_df["日期"].iloc[-1]).strip()[:10]
+        try:
+            last_dt = datetime.strptime(last_date, "%Y-%m-%d").date()
+        except ValueError:
+            last_dt = None
+        if last_dt is not None and (today - last_dt).days <= 3:
+            return local_df
     try:
         r = _sina_session().get(
             f"http://d.10jqka.com.cn/v6/line/bk_{code}/01/last.js", timeout=8,
             headers={"User-Agent": "Mozilla/5.0", "Referer": "https://q.10jqka.com.cn/"})
         m = _re.search(r"\((\{.*\})\)\s*$", r.text, _re.S)
         if not m:
-            return _empty(cols)
+            return local_df if local_df is not None else _empty(cols)
         obj = _json.loads(m.group(1))
         rows = []
         for seg in (obj.get("data") or "").split(";"):
@@ -606,11 +611,14 @@ def get_ths_index_daily(code: str = "883902", days: int = 200) -> pd.DataFrame:
         df = pd.DataFrame(rows)
     except Exception as e:
         logger.warning("同花顺指数日K %s 失败：%s", code, e)
-        return _empty(cols)
-    return df.tail(days).reset_index(drop=True) if not df.empty else _empty(cols)
+        return local_df if local_df is not None else _empty(cols)
+    result = df.tail(days).reset_index(drop=True) if not df.empty else _empty(cols)
+    if not result.empty:
+        ts.save_ths_index(code, result)
+    return result
 
 
-@ttl_cache(cfg.SPOT_TTL)
+@ttl_cache(cfg.SPOT_TTL, l1_ttl=cfg.L1_TTL_SPOT)
 def get_index_spot() -> pd.DataFrame:
     """主要指数实时。新浪首选（快），东财兜底。"""
     try:
@@ -635,7 +643,7 @@ def get_index_spot() -> pd.DataFrame:
 
 
 # ── 同花顺热榜（热门个股）──────────────────────────────────────────────────
-@ttl_cache(cfg.SPOT_TTL)
+@ttl_cache(cfg.SPOT_TTL, l1_ttl=cfg.L1_TTL_SPOT)
 def get_hot_stocks(top: int = 10) -> pd.DataFrame:
     """同花顺热榜前N热门股：排名/代码/名称/热度/最新价/涨跌幅。
 

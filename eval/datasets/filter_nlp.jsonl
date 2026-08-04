@@ -1,0 +1,35 @@
+{"input": "股价大于20元", "expected": [{"field": "price", "min": 20}]}
+{"input": "百日新高", "expected": [{"field": "new_high", "days": 100}]}
+{"input": "5日涨幅大于10%", "expected": [{"field": "return_ndays", "days": 5, "min_pct": 10}]}
+{"input": "30天涨幅大于40%", "expected": [{"field": "return_ndays", "days": 30, "min_pct": 40}]}
+{"input": "收盘价大于5日均线", "expected": [{"field": "close_gt_ma", "ma": 5}]}
+{"input": "跌破20日线", "expected": [{"field": "close_lt_ma", "ma": 20}]}
+{"input": "成交额大于30亿", "expected": [{"field": "amount", "min_yi": 30}]}
+{"input": "换手率大于5%", "expected": [{"field": "turnover_rate", "min_pct": 5}]}
+{"input": "流通市值大于30亿", "expected": [{"field": "free_float_cap", "min_yi": 30}]}
+{"input": "总市值大于100亿", "expected": [{"field": "total_cap", "min_yi": 100}]}
+{"input": "量比大于2", "expected": [{"field": "volume_surge", "ratio": 2}]}
+{"input": "连续上涨3天", "expected": [{"field": "consecutive_up", "days": 3}]}
+{"input": "连续下跌5天", "expected": [{"field": "consecutive_down", "days": 5}]}
+{"input": "均线多头排列", "expected": [{"field": "ma_bullish"}]}
+{"input": "均线空头排列", "expected": [{"field": "ma_bearish"}]}
+{"input": "属于半导体板块", "expected": [{"field": "sector", "name": "半导体"}]}
+{"input": "不要北交所", "expected": [{"field": "board", "name": "北交所", "exclude": true}]}
+{"input": "非创业板", "expected": [{"field": "board", "name": "创业板", "exclude": true}]}
+{"input": "剔除科创板和北交所", "expected": [{"field": "board", "name": "科创板", "exclude": true}, {"field": "board", "name": "北交所", "exclude": true}]}
+{"input": "5日跌幅大于5%", "expected": [{"field": "return_ndays", "days": 5, "max_pct": -5}]}
+{"input": "今日涨幅大于2%", "expected": [{"field": "return_ndays", "days": 1, "min_pct": 2}]}
+{"input": "股价10到50元", "expected": [{"field": "price", "min": 10, "max": 50}]}
+{"input": "成交额小于5亿", "expected": [{"field": "amount", "max_yi": 5}]}
+{"input": "流通市值30到200亿", "expected": [{"field": "free_float_cap", "min_yi": 30, "max_yi": 200}]}
+{"input": "百日新高且成交额大于30亿的非北交所股票", "expected": [{"field": "new_high", "days": 100}, {"field": "amount", "min_yi": 30}, {"field": "board", "name": "北交所", "exclude": true}]}
+{"input": "收盘价大于5日均线且30天涨幅大于40%属于半导体板块", "expected": [{"field": "close_gt_ma", "ma": 5}, {"field": "return_ndays", "days": 30, "min_pct": 40}, {"field": "sector", "name": "半导体"}]}
+{"input": "60日新低", "expected": [{"field": "new_low", "days": 60}]}
+{"input": "连续3日收盘在10日均线上方", "expected": [{"field": "close_gt_ma", "ma": 10, "days": 3}]}
+{"input": "放量3倍", "expected": [{"field": "volume_surge", "ratio": 3}]}
+{"input": "距百日高点回撤10%以内", "expected": [{"field": "drawdown_from_high", "days": 100, "max_pct": 10}]}
+{"input": "回撤超过30%", "expected": [{"field": "drawdown_from_high", "days": 100, "min_pct": 30}]}
+{"input": "今日下跌", "expected": [{"field": "return_ndays", "days": 1, "max_pct": 0}]}
+{"input": "换手率小于20%", "expected": [{"field": "turnover_rate", "max_pct": 20}]}
+{"input": "连涨五天", "expected": [{"field": "consecutive_up", "days": 5}]}
+{"input": "主板股票且股价大于5元", "expected": [{"field": "board", "name": "主板"}, {"field": "price", "min": 5}]}

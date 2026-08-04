@@ -1,0 +1,19 @@
+{
+  "total": 86,
+  "has_signal": 86,
+  "has_cycle": 86,
+  "signals": {
+    "空": 38,
+    "转": 22,
+    "多": 26
+  },
+  "pass": 1,
+  "fail": 0,
+  "signal_distribution": {
+    "空": 38,
+    "多": 26,
+    "转": 22
+  },
+  "note": "择时数据集：86条，含信号86条，含周期86条",
+  "ai_judge_available": true
+}

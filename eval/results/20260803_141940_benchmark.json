@@ -1,0 +1,48 @@
+{
+  "pass": 7,
+  "fail": 0,
+  "benchmarks": [
+    {
+      "name": "get_stock_spot (Redis命中)",
+      "avg_ms": 11.5,
+      "threshold_ms": 200,
+      "status": "pass"
+    },
+    {
+      "name": "get_index_spot (Redis命中)",
+      "avg_ms": 0.8,
+      "threshold_ms": 200,
+      "status": "pass"
+    },
+    {
+      "name": "get_hot_stocks (Redis命中)",
+      "avg_ms": 44.0,
+      "threshold_ms": 100,
+      "status": "pass"
+    },
+    {
+      "name": "get_stock_quote_fast",
+      "avg_ms": 37.6,
+      "threshold_ms": 500,
+      "status": "pass"
+    },
+    {
+      "name": "knowledge.search",
+      "avg_ms": 339.8,
+      "threshold_ms": 3000,
+      "status": "pass"
+    },
+    {
+      "name": "parse_filter_conditions (本地关键字)",
+      "avg_ms": 0.1,
+      "threshold_ms": 50,
+      "status": "pass"
+    },
+    {
+      "name": "redis_set + redis_get",
+      "avg_ms": 0.3,
+      "threshold_ms": 10,
+      "status": "pass"
+    }
+  ]
+}

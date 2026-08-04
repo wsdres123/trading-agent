@@ -1,0 +1,60 @@
+{
+  "total": 86,
+  "matched_signal": 5,
+  "correct_signal": 5,
+  "matched_cycle": 5,
+  "correct_cycle": 5,
+  "pass": 1,
+  "fail": 0,
+  "signal_distribution": {
+    "空": 38,
+    "多": 26,
+    "转": 22
+  },
+  "details": [
+    {
+      "date": "2026-07-28",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-29",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-30",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-07-31",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    },
+    {
+      "date": "2026-08-03",
+      "expected_signal": "空",
+      "ai_signal": "空",
+      "expected_cycle": "B",
+      "ai_cycle": "B",
+      "status": "pass"
+    }
+  ],
+  "accuracy": 1.0,
+  "signal_accuracy": 1.0,
+  "cycle_accuracy": 1.0,
+  "note": "AI缓存匹配 5/86 天。信号准确率 100.0%(5/5)，周期准确率 100.0%(5/5)。"
+}

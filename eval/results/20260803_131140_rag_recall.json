@@ -1,0 +1,28 @@
+{
+  "total": 20,
+  "correct": 18,
+  "recall_accuracy": 0.9,
+  "pass": 18,
+  "fail": 2,
+  "details": [
+    {
+      "query": "均线多头排列代表什么",
+      "status": "fail",
+      "recall": 0.33,
+      "missed": [
+        "多头",
+        "均线"
+      ]
+    },
+    {
+      "query": "百日新高选股逻辑",
+      "status": "fail",
+      "recall": 0.0,
+      "missed": [
+        "新高",
+        "100日",
+        "突破"
+      ]
+    }
+  ]
+}

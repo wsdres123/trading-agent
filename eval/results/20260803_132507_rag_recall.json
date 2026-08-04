@@ -1,0 +1,46 @@
+{
+  "total": 20,
+  "correct": 16,
+  "recall_accuracy": 0.8,
+  "pass": 16,
+  "fail": 4,
+  "details": [
+    {
+      "query": "打板大面怎么处理",
+      "status": "fail",
+      "recall": 0.33,
+      "missed": [
+        "退潮",
+        "纪律"
+      ]
+    },
+    {
+      "query": "空仓纪律什么时候执行",
+      "status": "fail",
+      "recall": 0.33,
+      "missed": [
+        "D周期",
+        "B周期"
+      ]
+    },
+    {
+      "query": "均线多头排列代表什么",
+      "status": "fail",
+      "recall": 0.33,
+      "missed": [
+        "多头",
+        "均线"
+      ]
+    },
+    {
+      "query": "百日新高选股逻辑",
+      "status": "fail",
+      "recall": 0.0,
+      "missed": [
+        "新高",
+        "100日",
+        "突破"
+      ]
+    }
+  ]
+}

@@ -83,6 +83,8 @@ THS_BASE_URL = os.environ.get("THS_BASE_URL", "https://fuyao.aicubes.cn/api")
 
 QWEN_BASE_URL = os.environ.get("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 QWEN_CHAT_MODEL = os.environ.get("QWEN_CHAT_MODEL", "qwen3.7-max")
+QWEN_PLUS_MODEL = os.environ.get("QWEN_PLUS_MODEL", "qwen-plus")
+QWEN_TURBO_MODEL = os.environ.get("QWEN_TURBO_MODEL", "qwen-turbo")
 QWEN_EMBEDDING_MODEL = os.environ.get("QWEN_EMBEDDING_MODEL", "text-embedding-v3")
 
 
@@ -105,6 +107,45 @@ FONT_FAMILY = "'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif"
 SPOT_TTL = 60          # 实时快照 1 分钟
 BOARD_TTL = 86400      # 板块成分股 1 天
 HIST_TTL = 300         # 历史K线 5 分钟
+
+# ── L1 内存缓存（进程级，跳过 Redis 网络 IO）──────────────────────────────
+L1_TTL_SPOT = 10       # spot/热数据 10 秒
+L1_TTL_KLINE = 15      # K线数据 15 秒
+
+# ── DuckDB 时序存储 ───────────────────────────────────────────────────────
+TS_DIR = DATA_DIR / "ts"
+TS_DIR.mkdir(parents=True, exist_ok=True)
+for _sd in ("index_daily", "ths_index", "snapshots"):
+    (TS_DIR / _sd).mkdir(exist_ok=True)
+SNAPSHOT_HOUR = 15
+SNAPSHOT_MINUTE = 5
+
+# ── Redis 缓存 ────────────────────────────────────────────────────────────
+REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
+REDIS_DB = int(os.environ.get("REDIS_DB", "0"))
+REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "")
+REDIS_KEY_PREFIX = os.environ.get("REDIS_KEY_PREFIX", "jc")
+REDIS_ENABLED = os.environ.get("REDIS_ENABLED", "true").lower() in ("true", "1", "yes")
+
+# ── FastAPI 异步服务 ──────────────────────────────────────────────────────
+FASTAPI_HOST = os.environ.get("FASTAPI_HOST", "0.0.0.0")
+FASTAPI_PORT = int(os.environ.get("FASTAPI_PORT", "8602"))
+
+# ── 异步拉取参数 ──────────────────────────────────────────────────────────
+ASYNC_MAX_CONNECTIONS = int(os.environ.get("ASYNC_MAX_CONNECTIONS", "100"))
+ASYNC_MAX_KEEPALIVE = int(os.environ.get("ASYNC_MAX_KEEPALIVE", "20"))
+ASYNC_TIMEOUT = float(os.environ.get("ASYNC_TIMEOUT", "10.0"))
+
+
+def is_trading_hours() -> bool:
+    """判断当前是否在A股交易时段（周一至周五 09:25–15:05）。"""
+    from datetime import datetime
+    now = datetime.now()
+    if now.weekday() >= 5:
+        return False
+    m = now.hour * 60 + now.minute
+    return 565 <= m <= 905  # 09:25=565, 15:05=905
 
 
 def as_project_path(rel: str) -> Path:

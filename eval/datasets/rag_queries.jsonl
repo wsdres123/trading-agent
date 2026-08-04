@@ -1,0 +1,108 @@
+{"query": "什么是混沌节点", "expected_keywords": ["混沌", "震荡", "大面", "20"]}
+{"query": "混沌分歧怎么判断", "expected_keywords": ["混沌分歧", "大面", "30", "跌停"]}
+{"query": "主升确认的条件是什么", "expected_keywords": ["主升确认", "主线", "大面", "连板", "高度"]}
+{"query": "主升加速有什么特征", "expected_keywords": ["主升加速", "一字板", "缩量", "核心"]}
+{"query": "主升高潮和主升加速有什么区别", "expected_keywords": ["主升高潮", "补涨", "跳空", "加速"]}
+{"query": "主升分歧是机会还是风险", "expected_keywords": ["主升分歧", "低吸", "分歧转一致", "机会"]}
+{"query": "主升分歧转一致怎么操作", "expected_keywords": ["分歧转一致", "韧性", "核心", "上午分歧"]}
+{"query": "主升延续阶段怎么做补涨", "expected_keywords": ["主升", "补涨", "龙头", "确认"]}
+{"query": "退潮节点的大面数标准", "expected_keywords": ["退潮", "大面", "50", "跌停", "空仓"]}
+{"query": "退潮加速阶段特征", "expected_keywords": ["退潮", "加速", "节点", "冰点"]}
+{"query": "冰点转折节点的市场表现", "expected_keywords": ["冰点", "节点", "情绪", "周期"]}
+{"query": "退潮转衰竭的信号", "expected_keywords": ["衰竭", "跌停", "减少", "反核"]}
+{"query": "弱修复的判断标准", "expected_keywords": ["弱修复", "50%", "大面", "缩量"]}
+{"query": "中等修复大面减少多少", "expected_keywords": ["中等修复", "70%", "大面", "核心"]}
+{"query": "强修复需要什么条件", "expected_keywords": ["强修复", "90%", "大阳", "打板大面", "10"]}
+{"query": "打板大面对情绪的影响", "expected_keywords": ["打板大面", "情绪", "质量", "打折"]}
+{"query": "情绪节点有哪些大类", "expected_keywords": ["混沌", "主升", "退潮", "修复", "冰点"]}
+{"query": "退潮期应该怎么操作", "expected_keywords": ["退潮", "空仓", "规避"]}
+{"query": "修复类节点次日能不能跳到退潮", "expected_keywords": ["修复", "退潮", "混沌", "不可能"]}
+{"query": "前日大面低基数怎么判断节点", "expected_keywords": ["低基数", "10", "绝对值", "混沌"]}
+{"query": "趋势A周期怎么识别", "expected_keywords": ["趋势A", "共振", "2.5万亿", "主线"]}
+{"query": "趋势A周期的结束信号", "expected_keywords": ["结束", "爆量", "大阳", "大阴", "见顶"]}
+{"query": "龙头A周期需要什么条件", "expected_keywords": ["龙头A", "破局龙", "缩量", "空间压制"]}
+{"query": "龙头A的买点有哪些", "expected_keywords": ["买点", "打破空间", "分歧转一致", "弱转强"]}
+{"query": "B周期仓位和操作建议", "expected_keywords": ["中级周期", "仓位", "3层", "模式"]}
+{"query": "C周期出现频率多高", "expected_keywords": ["C周期", "1年", "1-2次", "全面放量"]}
+{"query": "D周期为什么必须空仓", "expected_keywords": ["D周期", "空仓", "缩量阴跌", "无赚钱效应"]}
+{"query": "趋势A和龙头A的区别", "expected_keywords": ["趋势A", "龙头A", "频率", "量能", "主线"]}
+{"query": "趋势A周期对主线和量能的要求", "expected_keywords": ["趋势A", "主线", "模式", "周期"]}
+{"query": "B周期为什么不做弱转强", "expected_keywords": ["B周期", "弱转强", "不做", "题材轮动"]}
+{"query": "趋势A周期仓位和ETF操作", "expected_keywords": ["趋势A", "满仓", "ETF", "仓位"]}
+{"query": "连板空间压制是什么意思", "expected_keywords": ["连板", "空间", "压制", "5板"]}
+{"query": "中级周期有哪几种分类", "expected_keywords": ["趋势A", "龙头A", "B", "C", "D"]}
+{"query": "C周期触发条件和行情种类", "expected_keywords": ["C", "中级周期", "行情种类", "一波流"]}
+{"query": "指数爆量后节点怎么走", "expected_keywords": ["爆量", "节点", "修复", "确认"]}
+{"query": "924行情属于什么周期", "expected_keywords": ["924", "C周期", "2024"]}
+{"query": "趋势A周期历史案例有哪些", "expected_keywords": ["趋势A", "2025-12", "2026-04", "2026-06"]}
+{"query": "龙头A周期破局龙和补涨模式", "expected_keywords": ["龙头A", "龙头补涨", "空间压制", "确定性"]}
+{"query": "短线模式的起变信号是什么", "expected_keywords": ["起变信号", "4板", "连板", "溢价率"]}
+{"query": "连板指数修复节点怎么做", "expected_keywords": ["连板指数", "修复", "节点", "龙头"]}
+{"query": "突破空间压制模式怎么操作", "expected_keywords": ["突破空间", "5板", "分歧转一致", "换手"]}
+{"query": "短线分歧转一致模式的买点", "expected_keywords": ["分歧转一致", "爆量", "板块回流", "首板"]}
+{"query": "新题材同身位模式是什么", "expected_keywords": ["新题材", "同身位", "一字", "30亿", "封单"]}
+{"query": "短线补涨模式怎么做", "expected_keywords": ["补涨", "龙头断板", "空间溢价", "1进2"]}
+{"query": "短线模式的卖点是什么", "expected_keywords": ["卖点", "30分钟", "不上水", "退潮"]}
+{"query": "连板指数883958是什么", "expected_keywords": ["883958", "连板", "溢价率"]}
+{"query": "微盘股指数883418的作用", "expected_keywords": ["883418", "微盘", "大跌", "-1%"]}
+{"query": "短线龙头怕什么情况", "expected_keywords": ["龙头", "怕", "指数大涨", "大跌"]}
+{"query": "起变信号对连板空间有什么要求", "expected_keywords": ["起变", "4板", "一字板", "股权变更"]}
+{"query": "短线模式有几种类型", "expected_keywords": ["突破空间", "分歧转一致", "同身位", "补涨"]}
+{"query": "庄股筛选条件和模式要求", "expected_keywords": ["庄股", "筛选", "模式条件", "确定性"]}
+{"query": "主线模式个股怎么筛选", "expected_keywords": ["主线", "核心容量", "补涨", "前5"]}
+{"query": "短线模式个股的来源", "expected_keywords": ["短线", "起变信号", "模式", "个股"]}
+{"query": "庄股的买卖点怎么定", "expected_keywords": ["庄股", "低吸", "破5日均线", "卖点"]}
+{"query": "个股模式包含主线短线和庄股", "expected_keywords": ["主线模式", "短线模式", "庄股", "个股"]}
+{"query": "庄股不受什么影响", "expected_keywords": ["庄股", "板块", "题材周期", "不受"]}
+{"query": "什么周期会弹出个股推荐", "expected_keywords": ["A", "B", "C", "周期", "弹"]}
+{"query": "庄股自由流通市值要求多少", "expected_keywords": ["自由流通市值", "30亿"]}
+{"query": "庄股5日涨幅要求多少", "expected_keywords": ["5日涨幅", "15%"]}
+{"query": "主线筛选方法和指数共振条件", "expected_keywords": ["主线", "创新高", "转折点", "共振"]}
+{"query": "主线板块持续强度和分歧修复", "expected_keywords": ["主线", "分歧", "修复", "核心"]}
+{"query": "趋势核心阵眼有什么特征", "expected_keywords": ["阵眼", "100亿", "主动性", "抗跌"]}
+{"query": "趋势核心的卖点有哪些", "expected_keywords": ["破5日线", "退潮", "跌停", "2次分歧"]}
+{"query": "趋势补涨和核心个股买卖点对比", "expected_keywords": ["趋势", "核心", "买点", "卖点"]}
+{"query": "主线ETF什么时候买", "expected_keywords": ["ETF", "创新高", "前3天", "确认"]}
+{"query": "趋势补涨的卖点是什么", "expected_keywords": ["破3日线", "退潮", "补涨"]}
+{"query": "主升时主线票表现怎么样", "expected_keywords": ["主升", "上涨最猛", "分歧", "最抗跌"]}
+{"query": "主线诞生时机和指数共振", "expected_keywords": ["主线", "指数", "转折点", "共振"]}
+{"query": "趋势核心阵眼的卖点判断", "expected_keywords": ["阵眼", "卖点", "破5日线", "分歧"]}
+{"query": "趋势A周期适用于什么操作", "expected_keywords": ["趋势A", "主线", "全仓", "操作"]}
+{"query": "竞价表怎么分析", "expected_keywords": ["竞价", "节点", "亏效", "断板", "一字"]}
+{"query": "复盘表的指数择时怎么看", "expected_keywords": ["指数择时", "多", "空", "转", "信号"]}
+{"query": "竞价表里的量能代表什么", "expected_keywords": ["量能", "成交额", "竞价"]}
+{"query": "小票亏效和大票亏效有什么区别", "expected_keywords": ["小票亏效", "大票亏效", "竞价"]}
+{"query": "竞价大面数什么意思", "expected_keywords": ["竞价大面", "9点45", "3分钟", "尾盘面数"]}
+{"query": "屠龙表怎么使用", "expected_keywords": ["屠龙表", "复盘", "竞价", "周期", "中级"]}
+{"query": "复盘表情绪评分和节点判断", "expected_keywords": ["情绪", "节点", "断板", "复盘"]}
+{"query": "中级周期系统怎么用", "expected_keywords": ["中级周期", "趋势A", "龙头A", "B", "C", "D"]}
+{"query": "短线周期分歧和退潮节点特征", "expected_keywords": ["分歧", "退潮", "连板", "节点"]}
+{"query": "短线周期修复阶段特征", "expected_keywords": ["修复", "大面减少", "反核", "封板率"]}
+{"query": "短线周期混沌阶段特点", "expected_keywords": ["混沌", "退潮", "题材混乱", "轮动"]}
+{"query": "短线模式里的接力是什么意思", "expected_keywords": ["接力", "连板", "行情种类", "模式"]}
+{"query": "新题材同身位的确定性多高", "expected_keywords": ["新题材同身位", "确定性", "高", "大单"]}
+{"query": "一波流行情怎么做", "expected_keywords": ["一波流", "中级周期", "行情种类"]}
+{"query": "短线模式的仓位控制", "expected_keywords": ["仓位", "3层", "惩罚机制"]}
+{"query": "复盘表仓位建议和开仓决策", "expected_keywords": ["仓位", "建议", "不开", "核心"]}
+{"query": "指数择时多空转信号含义", "expected_keywords": ["指数择时", "多", "空", "转"]}
+{"query": "多空转信号怎么判断", "expected_keywords": ["多", "空", "转", "信号", "平均股价"]}
+{"query": "多空转信号和趋势确认", "expected_keywords": ["多", "空", "转", "趋势"]}
+{"query": "指数择时两个转一个多代表什么", "expected_keywords": ["俩转一多", "趋势A", "C周期", "行情"]}
+{"query": "空叠加D周期应该怎么操作", "expected_keywords": ["空", "D周期", "空仓", "必须"]}
+{"query": "空叠加B周期能操作吗", "expected_keywords": ["空", "B周期", "小仓位", "仓位"]}
+{"query": "复盘表的大盘指数和微盘指数看什么", "expected_keywords": ["大盘指数", "微盘指数", "复盘"]}
+{"query": "日内强势题材怎么利用", "expected_keywords": ["日内强势题材", "主线", "题材", "档位"]}
+{"query": "竞价表的断板列代表什么", "expected_keywords": ["断板", "连板", "竞价", "情绪"]}
+{"query": "情绪趋势列怎么分析", "expected_keywords": ["情绪趋势", "竞价", "方向"]}
+{"query": "超预期方向列怎么用", "expected_keywords": ["超预期", "风格", "题材", "方向"]}
+{"query": "接力赚效大于3%什么意思", "expected_keywords": ["接力", "赚效", "3%", "溢价"]}
+{"query": "复盘表的情绪节点怎么和竞价表对应", "expected_keywords": ["情绪节点", "竞价表", "复盘表", "对应"]}
+{"query": "仓位建议和中级周期什么关系", "expected_keywords": ["仓位", "中级周期", "全仓", "空仓", "3层"]}
+{"query": "主线筛选的成交额要求", "expected_keywords": ["成交额", "30亿", "主线"]}
+{"query": "趋势核心成交额一般多少", "expected_keywords": ["成交额", "100亿", "阵眼", "容量"]}
+{"query": "B周期高潮节点和仓位管理", "expected_keywords": ["中级周期", "节点", "仓位", "情绪"]}
+{"query": "龙头A只做龙头不做其他是什么意思", "expected_keywords": ["龙头A", "只做", "龙头", "其他不看"]}
+{"query": "短线修复次日容易出什么走势", "expected_keywords": ["修复次日", "加速", "分歧", "一致"]}
+{"query": "连板空间4板以下怎么判断", "expected_keywords": ["4板", "空间压制", "连板"]}
+{"query": "情绪节点判断的时间点", "expected_keywords": ["14:57", "尾盘", "判断", "每日"]}
+{"query": "主升分歧节点的盘面特征", "expected_keywords": ["主升", "分歧", "节点", "大面数"]}

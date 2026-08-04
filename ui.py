@@ -98,7 +98,7 @@ with st.container():
         + "".join(_status_chips) + '</div>',
         unsafe_allow_html=True,
     )
-    _FEATURES = ["指数择时", "主线模式", "短线模式", "个股模式", "明日推演", "AI助手"]
+    _FEATURES = ["指数择时", "主线模式", "短线模式", "个股模式", "明日推演", "AI助手", "评测报告"]
     _feature = st.radio("功能", _FEATURES, horizontal=True, label_visibility="collapsed")
 
 
@@ -495,7 +495,7 @@ if _feature == "指数择时":
     _hot = data.get_hot_stocks(top=10)
     if not _hot.empty:
         _hpct = pd.to_numeric(_hot.get("涨跌幅"), errors="coerce")
-        if _hpct is not None and _hpct.notna().any():
+        if isinstance(_hpct, pd.Series) and _hpct.notna().any():
             _hidx = float(_hpct.mean())
             _hc = cfg.COLOR_UP if _hidx > 0 else (cfg.COLOR_DOWN if _hidx < 0 else cfg.COLOR_TEXT)
             st.markdown(
@@ -591,16 +591,21 @@ if _feature == "指数择时":
             prog.empty()
             st.rerun()
     else:
-        # 盘中自动刷新（60秒），非交易时段不自动刷新
+        # 自适应自动刷新：竞价10s / 盘中30s / 尾盘15s / 非交易不刷新
         import datetime as _dt
         _now = _dt.datetime.now()
-        _is_trading = _now.weekday() < 5 and (
-            (_now.hour == 9 and _now.minute >= 25) or
-            (9 < _now.hour < 15) or
-            (_now.hour == 15 and _now.minute <= 5))
-        if _is_trading:
+        _m = _now.hour * 60 + _now.minute
+        _is_weekday = _now.weekday() < 5
+        if _is_weekday:
             from streamlit_autorefresh import st_autorefresh
-            st_autorefresh(interval=60000, key="avg_price_auto")
+            if 565 <= _m <= 570:       _interval = 10000   # 9:25-9:30 竞价
+            elif 570 < _m <= 690:      _interval = 30000   # 9:30-11:30 上午盘
+            elif 690 < _m <= 780:      _interval = None    # 午休不刷新
+            elif 780 < _m <= 890:      _interval = 30000   # 13:00-14:50 下午盘
+            elif 890 < _m <= 905:      _interval = 15000   # 14:50-15:05 尾盘
+            else:                      _interval = None    # 非交易不刷新
+            if _interval:
+                st_autorefresh(interval=_interval, key="avg_price_auto")
 
         # 每次加载都取最新实时均价（get_stock_spot 有60秒TTL缓存自动节流）
         _rt = data.get_realtime_avg_price()
@@ -633,7 +638,7 @@ if _feature == "指数择时":
             _pct_color = cfg.COLOR_UP if (_rt_pct and _rt_pct > 0) else (cfg.COLOR_DOWN if (_rt_pct and _rt_pct < 0) else cfg.COLOR_MUTED)
             st.markdown(
                 f'<div class="stat-box" style="margin-top:60px;">'
-                f'<div class="label">{"🔴 实时" if _is_trading else "平均"}平均股价</div>'
+                f'<div class="label">{"🔴 实时" if cfg.is_trading_hours() else "平均"}平均股价</div>'
                 f'<div class="val" style="color:{_rt_color};font-size:26px;">'
                 f'{f"{_rt_val:.3f}" if _rt_val else "—"}</div>'
                 + (f'<div class="val" style="color:{_pct_color};font-size:15px;">{_rt_pct:+.2f}%</div>' if _rt_pct is not None else "")
@@ -1257,49 +1262,104 @@ elif _feature == "个股模式":
             with _rc:
                 st.button("🔄 刷新", key="intra_refresh",
                           use_container_width=True)
-            with st.spinner("加载分时数据…"):
-                _intra = ss.get_intraday(_sel_code)
-            if not _intra.empty:
-                from plotly.subplots import make_subplots
-                _fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                                     vertical_spacing=0.04,
-                                     row_heights=[0.65, 0.35])
-                _fig.add_trace(go.Scatter(
-                    x=_intra["时间"], y=_intra["价格"],
-                    mode="lines", name="价格",
-                    line=dict(color=cfg.COLOR_STOCK, width=1.2),
-                    showlegend=False), row=1, col=1)
-                if "均价" in _intra.columns:
+            _chart_col, _ = st.columns([1, 1])
+            with _chart_col:
+                with st.spinner("加载分时数据…"):
+                    _intra = ss.get_intraday(_sel_code)
+                if not _intra.empty:
+                    from plotly.subplots import make_subplots
+                    _fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                                         vertical_spacing=0.04,
+                                         row_heights=[0.70, 0.30],
+                                         specs=[[{"secondary_y": True}],
+                                                [{"secondary_y": False}]])
+                    _pc = (float(_intra["昨收"].iloc[0])
+                           if "昨收" in _intra.columns else 0.0)
                     _fig.add_trace(go.Scatter(
-                        x=_intra["时间"], y=_intra["均价"],
-                        mode="lines", name="均价",
-                        line=dict(color=cfg.COLOR_MUTED, width=0.8,
-                                  dash="dash"),
-                        showlegend=False), row=1, col=1)
-                if "成交量" in _intra.columns:
-                    _prev = [_intra["价格"].iloc[0]] + list(
-                        _intra["价格"].iloc[:-1])
-                    _vcolors = [cfg.COLOR_UP if p >= pp else cfg.COLOR_DOWN
-                                for p, pp in zip(_intra["价格"], _prev)]
-                    _fig.add_trace(go.Bar(
-                        x=_intra["时间"], y=_intra["成交量"],
-                        name="量", marker=dict(color=_vcolors),
-                        showlegend=False), row=2, col=1)
-                _fig.update_layout(
-                    height=260, paper_bgcolor=cfg.COLOR_BG,
-                    plot_bgcolor=cfg.COLOR_PANEL,
-                    font=dict(color=cfg.COLOR_TEXT, size=10),
-                    margin=dict(l=42, r=8, t=4, b=4),
-                    showlegend=False)
-                _fig.update_xaxes(showticklabels=False, row=1, col=1)
-                _fig.update_xaxes(tickangle=0, dtick=30, row=2, col=1)
-                _fig.update_yaxes(gridcolor="#2a2a2a", row=1, col=1)
-                _fig.update_yaxes(gridcolor="#2a2a2a", row=2, col=1)
-                st.plotly_chart(_fig, use_container_width=True, theme=None)
-            else:
-                st.markdown(
-                    '<div class="muted">（无分时数据，可能非交易时段）</div>',
-                    unsafe_allow_html=True)
+                        x=_intra["时间"], y=_intra["价格"],
+                        mode="lines", name="价格",
+                        line=dict(color="#ffffff", width=1.2),
+                        fill="tozeroy" if not _pc else None,
+                        showlegend=False), row=1, col=1, secondary_y=False)
+                    if _pc:
+                        _fig.add_trace(go.Scatter(
+                            x=_intra["时间"], y=_intra["价格"],
+                            mode="lines", showlegend=False,
+                            line=dict(width=0),
+                            fill="tonexty",
+                            fillcolor="rgba(255,59,59,0.10)",
+                            hoverinfo="skip"), row=1, col=1, secondary_y=False)
+                        _fig.add_trace(go.Scatter(
+                            x=[_intra["时间"].iloc[0], _intra["时间"].iloc[-1]],
+                            y=[_pc, _pc],
+                            mode="lines", name="昨收",
+                            line=dict(color="#ffffff", width=0.8,
+                                      dash="dash"),
+                            showlegend=False), row=1, col=1, secondary_y=False)
+                    if "均价" in _intra.columns:
+                        _fig.add_trace(go.Scatter(
+                            x=_intra["时间"], y=_intra["均价"],
+                            mode="lines", name="均价",
+                            line=dict(color=cfg.COLOR_STOCK, width=0.8,
+                                      dash="dot"),
+                            showlegend=False), row=1, col=1, secondary_y=False)
+                    if _pc and "涨幅" in _intra.columns:
+                        _fig.add_trace(go.Scatter(
+                            x=_intra["时间"], y=_intra["涨幅"],
+                            mode="lines", showlegend=False,
+                            line=dict(width=0),
+                            hovertemplate="%{y:.2f}%<extra></extra>",
+                            hoverinfo="y"), row=1, col=1, secondary_y=True)
+                    if "成交量" in _intra.columns:
+                        _px = _intra["价格"].ffill()
+                        _prev = [_px.iloc[0]] + list(_px.iloc[:-1])
+                        _vcolors = [
+                            cfg.COLOR_UP if (pd.notna(p) and p >= pp)
+                            else (cfg.COLOR_DOWN if pd.notna(p) else "rgba(0,0,0,0)")
+                            for p, pp in zip(_intra["价格"], _prev)
+                        ]
+                        _fig.add_trace(go.Bar(
+                            x=_intra["时间"], y=_intra["成交量"],
+                            name="量", marker=dict(color=_vcolors),
+                            showlegend=False), row=2, col=1)
+                    _fig.update_layout(
+                        height=280, paper_bgcolor=cfg.COLOR_BG,
+                        plot_bgcolor=cfg.COLOR_PANEL,
+                        font=dict(color=cfg.COLOR_TEXT, size=9),
+                        margin=dict(l=42, r=36, t=4, b=4),
+                        showlegend=False)
+                    _fig.update_xaxes(showticklabels=False, row=1, col=1)
+                    _tick_vals = ["09:30", "10:30", "11:30",
+                                  "13:00", "14:00", "15:00"]
+                    _fig.update_xaxes(tickangle=0, tickvals=_tick_vals,
+                                      row=2, col=1)
+                    _fig.update_yaxes(gridcolor="#2a2a2a", row=1, col=1,
+                                      secondary_y=False)
+                    _fig.update_yaxes(gridcolor="#2a2a2a", row=2, col=1)
+                    if _pc and "涨幅" in _intra.columns:
+                        _valid_pct = _intra["涨幅"].dropna()
+                        if not _valid_pct.empty:
+                            _min_pct = float(_valid_pct.min()) - 0.5
+                            _max_pct = float(_valid_pct.max()) + 0.5
+                            _fig.update_yaxes(
+                                secondary_y=True, row=1, col=1,
+                                range=[_min_pct, _max_pct],
+                                tickformat=".1f",
+                                ticksuffix="%",
+                                gridcolor="rgba(0,0,0,0)",
+                                showgrid=False)
+                    _fig.add_vline(x="12:00", line_width=0.5,
+                                   line_dash="dot", line_color="#555555",
+                                   row=1, col=1)
+                    _fig.add_vline(x="12:00", line_width=0.5,
+                                   line_dash="dot", line_color="#555555",
+                                   row=2, col=1)
+                    st.plotly_chart(_fig, use_container_width=True,
+                                    theme=None)
+                else:
+                    st.markdown(
+                        '<div class="muted">（无分时数据，可能非交易时段）</div>',
+                        unsafe_allow_html=True)
 
     # 规范文档
     with st.expander("📖 个股模式规范（single stock.md）"):
@@ -1337,9 +1397,7 @@ if _feature == "AI助手":
             with st.chat_message("user"):
                 st.markdown(q)
             with st.chat_message("assistant"):
-                with st.spinner("思考中…"):
-                    ans = ai.chat(q, history=st.session_state.messages)
-                st.markdown(ans)
+                ans = st.write_stream(ai.chat_stream(q, history=st.session_state.messages))
             st.session_state.messages.append({"role": "assistant", "content": ans})
 
     # ── 个股分组筛选 ──────────────────────────────────────────────────────
@@ -1480,3 +1538,233 @@ if _feature == "AI助手":
                                              "涨停封单额", "自由流通市值(亿)", "成交额(亿)", "概念板块",
                                              "成交额", "流通市值_亿"] if c in gdf.columns]
                     sortable_big_table(gdf[show_cols] if show_cols else gdf)
+
+
+def _render_eval_results(results: dict, eval_dir):
+    """渲染评测结果面板。"""
+    import json as _json
+
+    # ── 总览卡片 ──────────────────────────────────────────────────────────
+    _total_p = sum(r.get("pass", 0) for r in results.values())
+    _total_f = sum(r.get("fail", 0) for r in results.values())
+    _total = _total_p + _total_f
+
+    _c1, _c2, _c3, _c4 = st.columns(4)
+    with _c1:
+        st.metric("总通过", _total_p)
+    with _c2:
+        st.metric("总失败", _total_f)
+    with _c3:
+        _rate = f"{_total_p / _total:.0%}" if _total else "-"
+        st.metric("通过率", _rate)
+    with _c4:
+        st.metric("评测维度", len(results))
+
+    # ── 数据完整性检查 ────────────────────────────────────────────────────
+    _DATA_TARGETS = [
+        ("情绪节点", "emotion_cases.jsonl", 100,
+         "需标注情绪转折节点(高潮/冰点/修复)，来源: 复盘表.csv"),
+        ("指数择时", "timing_cases.jsonl", 100,
+         "需标注每日择时信号(买入/卖出/观望)，来源: 复盘表.csv"),
+        ("筛选NLP", "filter_nlp.jsonl", 50,
+         "需手写自然语言→筛选条件映射用例"),
+        ("RAG检索", "rag_queries.jsonl", 30,
+         "需手写查询语句及期望命中的知识条目"),
+        ("工具路由", None, 30,
+         "需手写问题→期望工具映射，当前仅5条硬编码在test_tool_routing.py"),
+    ]
+    _ds_dir = eval_dir / "datasets"
+    _ds_counts = {}
+    if _ds_dir.exists():
+        for _fn in _ds_dir.glob("*.jsonl"):
+            with open(_fn, encoding="utf-8") as _f:
+                _ds_counts[_fn.name] = sum(1 for _ in _f)
+
+    with st.expander("📋 数据完整性检查", expanded=True):
+        _comp_cols = st.columns([2, 1, 1, 4])
+        with _comp_cols[0]:
+            st.markdown("**评测维度**")
+        with _comp_cols[1]:
+            st.markdown("**已有**")
+        with _comp_cols[2]:
+            st.markdown("**目标**")
+        with _comp_cols[3]:
+            st.markdown("**补充建议**")
+
+        for _name, _fname, _target, _hint in _DATA_TARGETS:
+            _cur_count = _ds_counts.get(_fname, 0) if _fname else 5
+            _pct = min(_cur_count / _target, 1.0)
+            _status = "✅" if _pct >= 1.0 else ("🟡" if _pct >= 0.5 else "🔴")
+            _cc1, _cc2, _cc3, _cc4 = st.columns([2, 1, 1, 4])
+            with _cc1:
+                st.markdown(f"{_status} {_name}")
+            with _cc2:
+                st.markdown(f"**{_cur_count}** 条")
+            with _cc3:
+                st.markdown(f"{_target} 条")
+            with _cc4:
+                if _pct < 1.0:
+                    _gap = _target - _cur_count
+                    st.markdown(f"<span style='color:#e67e22'>还需补充 ~{_gap} 条</span>  {_hint}", unsafe_allow_html=True)
+                else:
+                    st.markdown("数据充足")
+            st.progress(_pct)
+
+    # ── 各维度详情 ────────────────────────────────────────────────────────
+    for _dim_name, _r in results.items():
+        if not isinstance(_r, dict):
+            continue
+        _p = _r.get("pass", 0)
+        _f = _r.get("fail", 0)
+        _icon = "🟢" if _f == 0 and _p > 0 else ("🔴" if _f > 0 else "⚪")
+
+        with st.expander(f"{_icon} {_dim_name}  —  pass={_p}  fail={_f}", expanded=(_f > 0)):
+            # 关键指标
+            _metrics_row = []
+            if "accuracy" in _r:
+                _metrics_row.append(f"准确率: **{_r['accuracy']:.1%}**")
+            if "recall_accuracy" in _r:
+                _metrics_row.append(f"召回准确率: **{_r['recall_accuracy']:.1%}**")
+            if "overall_avg" in _r:
+                _metrics_row.append(f"LLM质量均分: **{_r['overall_avg']}/5**")
+            if "total" in _r:
+                _metrics_row.append(f"总用例: {_r['total']}")
+            if "correct" in _r:
+                _metrics_row.append(f"正确: {_r['correct']}")
+            if _metrics_row:
+                st.markdown("  ·  ".join(_metrics_row))
+
+            # 性能基准表
+            if "benchmarks" in _r:
+                _bdf = pd.DataFrame(_r["benchmarks"])
+                if not _bdf.empty:
+                    _bdf_show = _bdf[["name", "avg_ms", "threshold_ms", "status"]].copy()
+                    _bdf_show.columns = ["测试项", "平均耗时(ms)", "阈值(ms)", "状态"]
+                    st.dataframe(_bdf_show, use_container_width=True, hide_index=True)
+
+            # LLM 质量评分
+            if "scores" in _r:
+                _sdf = pd.DataFrame(_r["scores"])
+                if not _sdf.empty:
+                    _show_cols = [c for c in ["question", "avg", "status"] if c in _sdf.columns]
+                    if "scores" in _sdf.columns:
+                        for _sk in ("factual", "actionable", "concise", "risk_aware"):
+                            _sdf[_sk] = _sdf["scores"].apply(
+                                lambda x: x.get(_sk, "-") if isinstance(x, dict) else "-")
+                            _show_cols.append(_sk)
+                    st.dataframe(_sdf[_show_cols], use_container_width=True, hide_index=True)
+
+            # 节点/信号分布
+            if "node_distribution" in _r:
+                st.markdown("**节点分布:**")
+                _ndf = pd.DataFrame(list(_r["node_distribution"].items()), columns=["节点", "数量"])
+                st.dataframe(_ndf, use_container_width=True, hide_index=True)
+            if "signal_distribution" in _r:
+                st.markdown("**信号分布:**")
+                _sdf2 = pd.DataFrame(list(_r["signal_distribution"].items()), columns=["信号", "数量"])
+                st.dataframe(_sdf2, use_container_width=True, hide_index=True)
+
+            # 失败详情
+            _details = _r.get("details", [])
+            if _details:
+                _fail_only = [d for d in _details if d.get("status") != "pass"]
+                if _fail_only:
+                    st.markdown(f"**失败用例 ({len(_fail_only)}):**")
+                    for _d in _fail_only[:10]:
+                        _txt = _json.dumps(_d, ensure_ascii=False)
+                        if len(_txt) > 200:
+                            _txt = _txt[:200] + "…"
+                        st.markdown(f"- `{_txt}`")
+
+            # 备注
+            for _note_key in ("accuracy_note", "note"):
+                if _note_key in _r:
+                    st.caption(_r[_note_key])
+
+            # 错误
+            if "error" in _r:
+                st.error(_r["error"])
+
+
+# ── 评测报告 ───────────────────────────────────────────────────────────────
+if _feature == "评测报告":
+    import json as _json
+    import glob as _glob
+
+    st.markdown("### 📊 评测报告")
+
+    _eval_dir = Path(__file__).parent / "eval"
+    _results_dir = _eval_dir / "results"
+
+    # ── 运行评测 ──────────────────────────────────────────────────────────
+    _ev_col1, _ev_col2, _ev_col3, _ev_col4 = st.columns([2, 2, 2, 3])
+    with _ev_col1:
+        _run_no_llm = st.button("▶ 运行评测（无费用）", use_container_width=True)
+    with _ev_col2:
+        _run_all = st.button("▶ 运行全部（含LLM）", use_container_width=True)
+    with _ev_col3:
+        _run_filter = st.button("▶ 仅筛选NLP", use_container_width=True)
+    with _ev_col4:
+        st.caption("无费用 = 数据准确性 + 情绪/择时数据集 + 筛选NLP + RAG检索 + 性能基准")
+
+    if _run_no_llm or _run_all or _run_filter:
+        with st.spinner("评测运行中…"):
+            if _run_filter:
+                from eval.test_filter_nlp import run as _run_fn
+                _res = {"筛选NLP解析": _run_fn()}
+            else:
+                _res = {}
+                _modules = [
+                    ("数据准确性", "eval.test_data_accuracy"),
+                    ("情绪节点", "eval.test_emotion"),
+                    ("指数择时", "eval.test_timing"),
+                    ("筛选NLP解析", "eval.test_filter_nlp"),
+                    ("RAG检索质量", "eval.test_rag_recall"),
+                    ("性能基准", "eval.test_benchmark"),
+                ]
+                if _run_all:
+                    _modules.extend([
+                        ("LLM输出质量", "eval.test_llm_quality"),
+                        ("工具路由", "eval.test_tool_routing"),
+                    ])
+                import importlib as _il
+                for _name, _mod_path in _modules:
+                    try:
+                        _mod = _il.import_module(_mod_path)
+                        _res[_name] = _mod.run()
+                    except Exception as _e:
+                        _res[_name] = {"error": str(_e), "pass": 0, "fail": 0}
+        st.session_state["_eval_results"] = _res
+        st.rerun()
+
+    # ── 展示结果 ──────────────────────────────────────────────────────────
+    _cur = st.session_state.get("_eval_results")
+
+    # 历史报告选择
+    _hist_files = sorted(_results_dir.glob("*_summary.json"), reverse=True) if _results_dir.exists() else []
+    if not _cur and not _hist_files:
+        st.info("暂无评测结果。点击上方按钮运行评测。")
+    else:
+        # Tab: 当前结果 / 历史报告
+        _tab_labels = ["当前结果"]
+        if _hist_files:
+            _tab_labels.append("历史报告")
+        _tabs = st.tabs(_tab_labels)
+
+        with _tabs[0]:
+            if _cur:
+                _render_eval_results(_cur, _eval_dir)
+            else:
+                st.info("本次会话尚无评测结果。")
+
+        if len(_tabs) > 1:
+            with _tabs[1]:
+                _sel = st.selectbox("选择历史报告", [f.name for f in _hist_files[:20]])
+                if _sel:
+                    _hdata = _json.loads((_results_dir / _sel).read_text(encoding="utf-8"))
+                    _ts = _hdata.get("timestamp", "")
+                    st.caption(f"报告时间: {_ts}")
+                    _hres = {}
+                    for _m in _hdata.get("modules", []):
+                        _hres[_m["name"]] = _m.get("result", {"error": _m.get("error", "未知")})
+                    _render_eval_results(_hres, _eval_dir)
