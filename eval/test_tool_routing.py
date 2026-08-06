@@ -23,7 +23,6 @@ def _capture_tool_calls(question: str) -> list[dict]:
 
     calls = []
     try:
-        ctx_chunks = []
         messages = [
             {"role": "system", "content": ai_assistant.SYSTEM_PROMPT.format(context="")},
             {"role": "user", "content": question},

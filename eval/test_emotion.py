@@ -48,11 +48,18 @@ def _load_ai_cache() -> dict:
 
 
 def run(target_accuracy: float = 0.6) -> dict:
-    cases = load_jsonl("emotion_cases.jsonl")[:100]
+    """运行情绪节点评测。
+
+    按 AI 缓存日期与数据集日期交集筛选，不再固定取前 100 条，避免日期错位导致 0 匹配。
+    """
+    cases = load_jsonl("emotion_cases.jsonl")
     if not cases:
         return {"error": "无评测数据", "pass": 0, "fail": 0}
 
     ai_cache = _load_ai_cache()
+    # 按日期交集筛选
+    cases = [c for c in cases if _norm_date(c.get("date", "")) in ai_cache]
+
     results = {
         "total": len(cases),
         "matched": 0,

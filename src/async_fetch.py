@@ -32,38 +32,66 @@ _QQ_HEADERS = {"Referer": "https://finance.qq.com", "User-Agent": "Mozilla/5.0"}
 _SINA_HEADERS = {"Referer": "https://finance.sina.com.cn",
                  "User-Agent": "Mozilla/5.0"}
 
+# 异步限流：每源最大并发 + 最小请求间隔（秒），防止一次 gather 打满源站
+_SOURCE_LIMITS = {
+    "tencent": {"sem": asyncio.Semaphore(8), "min_interval": 0.05},
+    "sina": {"sem": asyncio.Semaphore(8), "min_interval": 0.05},
+    "ths": {"sem": asyncio.Semaphore(4), "min_interval": 0.1},
+}
+
+
+class _AsyncRateLimiter:
+    """简单异步限流器：控制每源最小请求间隔。"""
+
+    def __init__(self):
+        self._last: dict[str, float] = {}
+
+    async def acquire(self, source: str, min_interval: float):
+        now = time.time()
+        last = self._last.get(source, 0)
+        wait = max(0, min_interval - (now - last))
+        if wait > 0:
+            await asyncio.sleep(wait)
+        self._last[source] = time.time()
+
+
+_RATE_LIMITER = _AsyncRateLimiter()
+
 
 # ── Tencent batch spot (async) ────────────────────────────────────────────
 async def _tencent_spot_batch_async(
     client: httpx.AsyncClient, syms: list[str],
 ) -> list[dict]:
-    try:
-        r = await client.get(
-            "https://qt.gtimg.cn/q=" + ",".join(syms),
-            timeout=8, headers=_QQ_HEADERS)
-        text = r.content.decode("gbk", errors="replace")
-    except Exception as e:
-        logger.debug("Tencent batch failed: %s", e)
-        return []
-    rows = []
-    for line in text.splitlines():
-        f = line.split("~")
-        if len(f) < 47 or not f[1]:
-            continue
+    limit = _SOURCE_LIMITS["tencent"]
+    await _RATE_LIMITER.acquire("tencent", limit["min_interval"])
+    async with limit["sem"]:
         try:
-            rows.append({
-                "代码": f[2], "名称": f[1],
-                "最新价": float(f[3]), "涨跌额": float(f[31]),
-                "涨跌幅": float(f[32]),
-                "最高": float(f[33]) if f[33] else None,
-                "成交量": float(f[6]), "成交额": float(f[37]) * 1e4,
-                "换手率": float(f[38]) if f[38] else None,
-                "流通市值": float(f[44]) * 1e8 if f[44] else None,
-                "总市值": float(f[45]) * 1e8 if f[45] else None,
-            })
-        except (ValueError, IndexError):
-            continue
-    return rows
+            r = await client.get(
+                "https://qt.gtimg.cn/q=" + ",".join(syms),
+                timeout=8, headers=_QQ_HEADERS)
+            text = r.content.decode("gbk", errors="replace")
+        except Exception as e:
+            logger.debug("Tencent batch failed: %s", e)
+            return []
+        rows = []
+        for line in text.splitlines():
+            f = line.split("~")
+            if len(f) < 47 or not f[1]:
+                continue
+            try:
+                rows.append({
+                    "代码": f[2], "名称": f[1],
+                    "最新价": float(f[3]), "涨跌额": float(f[31]),
+                    "涨跌幅": float(f[32]),
+                    "最高": float(f[33]) if f[33] else None,
+                    "成交量": float(f[6]), "成交额": float(f[37]) * 1e4,
+                    "换手率": float(f[38]) if f[38] else None,
+                    "流通市值": float(f[44]) * 1e8 if f[44] else None,
+                    "总市值": float(f[45]) * 1e8 if f[45] else None,
+                })
+            except (ValueError, IndexError):
+                continue
+        return rows
 
 
 async def get_stock_spot_fast_async(
@@ -96,26 +124,29 @@ async def get_stock_spot_fast_async(
 async def _sina_fetch_async(
     client: httpx.AsyncClient, symbols: list[str],
 ) -> list[tuple[str, list[str]]]:
-    url = "https://hq.sinajs.cn/list=" + ",".join(symbols)
-    try:
-        resp = await client.get(url, timeout=5, headers=_SINA_HEADERS)
-        resp.raise_for_status()
-        text = resp.text
-    except Exception as e:
-        logger.debug("Sina fetch failed: %s", e)
-        return []
-    out = []
-    for line in text.splitlines():
-        if '="' not in line:
-            continue
+    limit = _SOURCE_LIMITS["sina"]
+    await _RATE_LIMITER.acquire("sina", limit["min_interval"])
+    async with limit["sem"]:
+        url = "https://hq.sinajs.cn/list=" + ",".join(symbols)
         try:
-            sym = line.split("hq_str_")[1].split("=")[0]
-            fields = line.split('="')[1].rstrip('";').split(",")
-            if len(fields) >= 10 and fields[0]:
-                out.append((sym, fields))
-        except Exception:
-            continue
-    return out
+            resp = await client.get(url, timeout=5, headers=_SINA_HEADERS)
+            resp.raise_for_status()
+            text = resp.text
+        except Exception as e:
+            logger.debug("Sina fetch failed: %s", e)
+            return []
+        out = []
+        for line in text.splitlines():
+            if '="' not in line:
+                continue
+            try:
+                sym = line.split("hq_str_")[1].split("=")[0]
+                fields = line.split('="')[1].rstrip('";').split(",")
+                if len(fields) >= 10 and fields[0]:
+                    out.append((sym, fields))
+            except Exception:
+                continue
+        return out
 
 
 async def sina_index_spot_async(
@@ -165,19 +196,22 @@ async def get_index_daily_async(
     symbol: str = "sh000001", days: int = 380,
 ) -> pd.DataFrame:
     cols = ["日期", "开盘", "最高", "最低", "收盘", "成交量"]
-    try:
-        r = await client.get(_SINA_KLINE_URL, timeout=8, params={
-            "symbol": symbol, "scale": 240, "ma": "no",
-            "datalen": days + 10})
-        arr = r.json()
-        df = pd.DataFrame([{
-            "日期": x["day"], "开盘": float(x["open"]),
-            "最高": float(x["high"]), "最低": float(x["low"]),
-            "收盘": float(x["close"]), "成交量": float(x["volume"]),
-        } for x in arr])
-    except Exception as e:
-        logger.warning("指数日K %s 失败：%s", symbol, e)
-        return pd.DataFrame(columns=cols)
+    limit = _SOURCE_LIMITS["sina"]
+    await _RATE_LIMITER.acquire("sina", limit["min_interval"])
+    async with limit["sem"]:
+        try:
+            r = await client.get(_SINA_KLINE_URL, timeout=8, params={
+                "symbol": symbol, "scale": 240, "ma": "no",
+                "datalen": days + 10})
+            arr = r.json()
+            df = pd.DataFrame([{
+                "日期": x["day"], "开盘": float(x["open"]),
+                "最高": float(x["high"]), "最低": float(x["low"]),
+                "收盘": float(x["close"]), "成交量": float(x["volume"]),
+            } for x in arr])
+        except Exception as e:
+            logger.warning("指数日K %s 失败：%s", symbol, e)
+            return pd.DataFrame(columns=cols)
     if df.empty:
         return pd.DataFrame(columns=cols)
     try:
@@ -208,35 +242,38 @@ async def get_ths_index_daily_async(
     code: str = "883902", days: int = 200,
 ) -> pd.DataFrame:
     cols = ["日期", "开盘", "最高", "最低", "收盘", "成交量"]
-    try:
-        r = await client.get(
-            f"http://d.10jqka.com.cn/v6/line/bk_{code}/01/last.js",
-            timeout=8,
-            headers={"User-Agent": "Mozilla/5.0",
-                     "Referer": "https://q.10jqka.com.cn/"})
-        m = re.search(r"\((\{.*\})\)\s*$", r.text, re.S)
-        if not m:
+    limit = _SOURCE_LIMITS["ths"]
+    await _RATE_LIMITER.acquire("ths", limit["min_interval"])
+    async with limit["sem"]:
+        try:
+            r = await client.get(
+                f"http://d.10jqka.com.cn/v6/line/bk_{code}/01/last.js",
+                timeout=8,
+                headers={"User-Agent": "Mozilla/5.0",
+                         "Referer": "https://q.10jqka.com.cn/"})
+            m = re.search(r"\(\(\{.*\}\)\)\s*$", r.text, re.S)
+            if not m:
+                return pd.DataFrame(columns=cols)
+            obj = json.loads(m.group(1))
+            rows = []
+            for seg in (obj.get("data") or "").split(";"):
+                seg = seg.strip()
+                if not seg:
+                    continue
+                p = seg.split(",")
+                if len(p) < 5:
+                    continue
+                d = p[0]
+                if len(d) == 8:
+                    d = f"{d[:4]}-{d[4:6]}-{d[6:]}"
+                vol = float(p[5]) if len(p) > 5 and p[5] else 0.0
+                rows.append({"日期": d, "开盘": float(p[1]),
+                             "最高": float(p[2]), "最低": float(p[3]),
+                             "收盘": float(p[4]), "成交量": vol})
+            df = pd.DataFrame(rows)
+        except Exception as e:
+            logger.warning("同花顺指数日K %s 失败：%s", code, e)
             return pd.DataFrame(columns=cols)
-        obj = json.loads(m.group(1))
-        rows = []
-        for seg in (obj.get("data") or "").split(";"):
-            seg = seg.strip()
-            if not seg:
-                continue
-            p = seg.split(",")
-            if len(p) < 5:
-                continue
-            d = p[0]
-            if len(d) == 8:
-                d = f"{d[:4]}-{d[4:6]}-{d[6:]}"
-            vol = float(p[5]) if len(p) > 5 and p[5] else 0.0
-            rows.append({"日期": d, "开盘": float(p[1]),
-                         "最高": float(p[2]), "最低": float(p[3]),
-                         "收盘": float(p[4]), "成交量": vol})
-        df = pd.DataFrame(rows)
-    except Exception as e:
-        logger.warning("同花顺指数日K %s 失败：%s", code, e)
-        return pd.DataFrame(columns=cols)
     return df.tail(days).reset_index(drop=True) if not df.empty \
         else pd.DataFrame(columns=cols)
 

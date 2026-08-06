@@ -1,0 +1,102 @@
+{
+  "pass": 2,
+  "fail": 194,
+  "timing_total": 89,
+  "timing_valid": 0,
+  "emotion_total": 107,
+  "emotion_valid": 2,
+  "issues_sample": [
+    {
+      "date": "2026-07-28",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-07-29",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-07-30",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-07-31",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-08-01",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-08-03",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-03-30",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-03-31",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-04-01",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    },
+    {
+      "date": "2026-04-02",
+      "type": "timing",
+      "issues": [
+        "缺失字段 confidence",
+        "缺失字段 evidence",
+        "confidence 越界: -1"
+      ]
+    }
+  ],
+  "schema_validity_rate": 1.0,
+  "note": "审计 196 条预测（timing 89 + emotion 107），schema 合法率 1.0%"
+}

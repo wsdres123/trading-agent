@@ -1,7 +1,6 @@
 """维度 8：性能基准 — 关键操作延迟和吞吐测量。"""
 from __future__ import annotations
 
-import time
 
 from eval.common import benchmark, save_result
 

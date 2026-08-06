@@ -15,11 +15,13 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import Counter
 
 import pandas as pd
 
 from config import settings as cfg
 from src import data, ths_data
+from src.schema_validator import load_spec_text
 
 logger = logging.getLogger("short_term")
 
@@ -307,9 +309,11 @@ def calc_space(zt_df: pd.DataFrame) -> int:
     return int(zt_df["连板数"].max())
 
 
-def calc_lianban_signal(code: str = "883958", n: int = 8) -> dict:
+def calc_lianban_signal(code: str = "883958", n: int = 8,
+                        date_str: str | None = None) -> dict:
     """883958 连板溢价信号：连阴>=3天后跳空高开拉红。
 
+    date_str: 分析日期，仅取该日及之前的K线（None则用最新数据）。
     返回 {triggered, prev_green_red_days, gap_up, turn_red, close, prev_close, klines}
     """
     df = data.get_ths_index_daily(code, days=n + 5)
@@ -320,6 +324,11 @@ def calc_lianban_signal(code: str = "883958", n: int = 8) -> dict:
         return result
 
     df = df.sort_values("日期").reset_index(drop=True)
+    if date_str:
+        df = df[df["日期"].astype(str).str[:10] <= date_str].reset_index(drop=True)
+    if df.empty or len(df) < 4:
+        return result
+
     today = df.iloc[-1]
     result["close"] = float(today["收盘"])
     result["prev_close"] = float(df.iloc[-2]["收盘"]) if len(df) >= 2 else None
@@ -351,9 +360,11 @@ def calc_lianban_signal(code: str = "883958", n: int = 8) -> dict:
     return result
 
 
-def calc_weipan_safe(code: str = "883418") -> dict:
+def calc_weipan_safe(code: str = "883418",
+                     date_str: str | None = None) -> dict:
     """883418 微盘股跌幅是否 > -1%（即不深跌）。
 
+    date_str: 分析日期，仅取该日及之前的K线（None则用最新数据）。
     返回 {safe, change_pct, close, prev_close}
     """
     df = data.get_ths_index_daily(code, days=5)
@@ -361,6 +372,10 @@ def calc_weipan_safe(code: str = "883418") -> dict:
     if df is None or df.empty or len(df) < 2:
         return result
     df = df.sort_values("日期").reset_index(drop=True)
+    if date_str:
+        df = df[df["日期"].astype(str).str[:10] <= date_str].reset_index(drop=True)
+    if df.empty or len(df) < 2:
+        return result
     today_close = float(df.iloc[-1]["收盘"])
     prev_close = float(df.iloc[-2]["收盘"])
     change_pct = (today_close / prev_close - 1) * 100 if prev_close else 0.0
@@ -368,6 +383,43 @@ def calc_weipan_safe(code: str = "883418") -> dict:
     result["close"] = today_close
     result["prev_close"] = prev_close
     result["safe"] = change_pct > -1.0
+    return result
+
+def calc_continuation_signal(code: str = "883958",
+                              date_str: str | None = None) -> dict:
+    """延续信号：起变信号出现第2天，连板指数还能维持3个点溢价。
+
+    date_str: 分析日期，仅取该日及之前的K线（None则用最新数据）。
+    返回 {triggered, premium_pct, yesterday_signal_date}
+    """
+    result = {"triggered": False, "premium_pct": 0.0, "yesterday_signal_date": ""}
+    state = _load_signal_state()
+    signal_date = state.get("signal_date", "")
+    if not signal_date:
+        return result
+
+    df = data.get_ths_index_daily(code, days=8)
+    if df is None or df.empty or len(df) < 2:
+        return result
+    df = df.sort_values("日期").reset_index(drop=True)
+    if date_str:
+        df = df[df["日期"].astype(str).str[:10] <= date_str].reset_index(drop=True)
+    if df.empty or len(df) < 2:
+        return result
+    last_date = str(df.iloc[-1]["日期"])[:10]
+    if last_date <= signal_date:
+        return result
+    trading_days_after = sum(
+        1 for d in df["日期"] if str(d)[:10] > signal_date
+    )
+    if trading_days_after != 1:
+        return result
+    today_close = float(df.iloc[-1]["收盘"])
+    prev_close = float(df.iloc[-2]["收盘"])
+    premium_pct = (today_close / prev_close - 1) * 100 if prev_close else 0.0
+    result["premium_pct"] = round(premium_pct, 2)
+    result["yesterday_signal_date"] = signal_date
+    result["triggered"] = premium_pct >= 3.0
     return result
 
 
@@ -393,8 +445,9 @@ def build_evidence(date_str: str) -> dict:
                 high_board = high_rows.iloc[0]
                 high_is_one_line = is_one_line_board(high_board)
 
-    lianban = calc_lianban_signal("883958")
-    weipan = calc_weipan_safe("883418")
+    lianban = calc_lianban_signal("883958", date_str=date_str)
+    weipan = calc_weipan_safe("883418", date_str=date_str)
+    continuation = calc_continuation_signal("883958", date_str=date_str)
 
     # 连板天梯摘要（前8只）
     ladder_summary = []
@@ -426,67 +479,332 @@ def build_evidence(date_str: str) -> dict:
         "high_board_is_one_line": high_is_one_line,
         "lianban_883958": lianban,
         "weipan_883418": weipan,
+        "continuation_883958": continuation,
         "ladder_count": len(ladder) if not ladder.empty else 0,
         "ladder_summary": ladder_summary,
     }
 
 
-# ── 大模型判断（核心 — 起变信号判断）──────────────────────────────────────
-AI_PROMPT = """你是A股短线情绪交易员，擅长连板梯队与情绪周期判断。请先学习【短线模式规范】（Short-term.md），
-再结合【竞价表历史】和【当日证据】，判断今日是否出现"起变信号"，并匹配对应短线模式。
+# ── 三层决策：硬门控 + 特征评分 + LLM 裁决 ─────────────────────────────
+def hard_gate(evidence: dict) -> dict:
+    """第一层：硬门控。事实性条件由程序判定，不依赖模型。"""
+    lb = evidence.get("lianban_883958", {})
+    wp = evidence.get("weipan_883418", {})
+    cont = evidence.get("continuation_883958", {})
+    space = evidence.get("space", 0)
 
-起变信号标准（需综合判断，不要求全部硬性满足，你可以根据经验加权判断）：
-1. 连板空间 > 4板（空间压制被打破）
-2. 高度板如果是一字板（封板<09:30且炸板=0），该票不能作为候选，但起变信号仍可触发——看连板天梯中是否有非一字板票出现分歧转一致
-3. 883958（昨日连板指数）连阴3天后跳空高开拉红（连板溢价率高）
-4. 883418（微盘股指数）跌幅不大于-1%（微盘股不深跌）
-5. 行情种类偏向接力，情绪红色1天
+    high_is_one_line = evidence.get("high_board_is_one_line", False)
 
-4种短线模式：
-1. 突破空间压制：2周内连板空间压制4板，今天暴量分歧转一致回封站上5板，带动板块回流
-   买点：暴量分歧转一致回封站上5板  卖点：30分钟不上水或次日退潮  仓位：5层
-2. 分歧转一致：情绪分歧2-3天后有修复预期，连板指数弱2-3天，个股爆量分歧转一致带动板块回流
-   买点：爆量分歧转一致上板  卖点：次日不能高开弱转强则兑现  仓位：3层以下
-3. 新题材同身位：竞价大单一字封单30亿+，最好3个10亿+同板块，新题材有想象力，做首板同身位换手板
-   买点：有一字做首个换手打板  卖点：次日一字封单减少则走  仓位：3层以下
-4. 补涨：高度龙头断板当天或爆量当天（龙头不能跌超-5%），做1进2不同板块或同板块首板补涨
-   买点：龙头断板当天做补涨  卖点：次日强转弱则走  仓位：3层
+    # 起变硬门控：连板空间>4 + 连板指数触发 + 微盘安全 + 高度板非一字板（有换手）
+    is_signal = (space > 4
+                 and lb.get("triggered", False)
+                 and wp.get("safe", True)
+                 and not high_is_one_line)
 
-候选股选择规则（重要）：
-- 一字板（封板时间<09:30且炸板次数=0）不能作为候选股，一字板是资金锁仓不是换手博弈
-- 分歧转一致模式：从连板天梯中找炸板次数>0的票（说明盘中分歧后回封=分歧转一致），优先高连板数
-- 突破空间压制模式：找站上新高度的票，但必须是非一字板（有换手有炸板=真博弈）
-- 候选股必须来自连板天梯数据，给出代码和名称
+    is_continuation = cont.get("triggered", False)
 
-请严格输出以下JSON（不要输出JSON以外的任何内容）：
-{{
-  "is_signal": true/false,
-  "signal_reason": "判断起变信号的理由（必填，100字内）",
-  "cycle_type": "行情种类判断（接力/趋势/混沌等）",
-  "modes": [
-    {{
-      "mode": "模式名",
-      "triggered": true/false,
-      "candidates": [{{"code": "代码", "name": "名称", "reason": "入选理由"}}],
-      "buy_point": "买点",
-      "sell_point": "卖点",
-      "position": "仓位建议"
-    }}
-  ],
-  "summary": "总结与操作建议（150字内）"
-}}
+    reasons = []
+    if is_signal:
+        reasons.append(f"连板空间{space}>4板")
+        reasons.append("883958连阴后跳空高开拉红")
+        reasons.append(f"微盘股{'安全' if wp.get('safe') else '不安全'}")
+    if is_continuation:
+        reasons.append(f"883958维持{cont.get('premium_pct', 0)}%溢价")
 
-只返回 triggered=true 的模式。如果无起变信号，is_signal=false，modes返回空数组，在summary说明原因。
+    return {
+        "is_signal": is_signal,
+        "is_continuation": is_continuation,
+        "high_is_one_line": high_is_one_line,
+        "premium_pct": cont.get("premium_pct", 0.0),
+        "reason": "；".join(reasons) if reasons else "未满足起变/延续硬条件",
+    }
 
-【短线模式规范】
-{spec}
+
+def score_modes(evidence: dict) -> list[dict]:
+    """第二层：特征评分。模式匹配得分 + 候选筛选由程序完成。"""
+    ladder = evidence.get("ladder_summary", [])
+    space = evidence.get("space", 0)
+    high_is_one_line = evidence.get("high_board_is_one_line", False)
+    results = []
+
+    # 模式1: 突破空间压制
+    hb = evidence.get("high_board")
+    breakout_score = 0
+    breakout_candidates = []
+    if hb and not high_is_one_line and space >= 5:
+        try:
+            breaks = int(hb.get("炸板次数", 0))
+        except (ValueError, TypeError):
+            breaks = 0
+        if breaks > 0:
+            breakout_score = 1.0
+            breakout_candidates.append({
+                "code": hb.get("代码", ""), "name": hb.get("名称", ""),
+                "boards": space, "reason": f"站上新高度{space}板 炸板{breaks}次（非一字有换手）"
+            })
+    results.append({
+        "mode": "突破空间压制", "score": breakout_score,
+        "candidates": breakout_candidates,
+        "buy_point": "暴量分歧转一致回封站上5板",
+        "sell_point": "30分钟不上水或次日退潮", "position": "5层",
+    })
+
+    # 模式2: 分歧转一致
+    divergence_candidates = []
+    for s in ladder:
+        try:
+            breaks = int(s.get("炸板次数", 0))
+        except (ValueError, TypeError):
+            breaks = 0
+        if breaks > 0 and not is_one_line_board(s):
+            divergence_candidates.append({
+                "code": s["代码"], "name": s["名称"],
+                "boards": s["连板数"],
+                "reason": f"{s['连板数']}板 炸板{breaks}次（分歧后回封）"
+            })
+    divergence_candidates.sort(key=lambda x: -x["boards"])
+    div_score = min(1.0, len(divergence_candidates) / 3)
+    results.append({
+        "mode": "分歧转一致", "score": div_score,
+        "candidates": divergence_candidates[:5],
+        "buy_point": "爆量分歧转一致上板",
+        "sell_point": "次日不能高开弱转强则兑现", "position": "3层以下",
+    })
+
+    # 模式3: 新题材同身位
+    yizi_candidates = []
+    for s in ladder:
+        if is_one_line_board(s):
+            try:
+                amount = float(s.get("封板资金(亿)", 0))
+            except (ValueError, TypeError):
+                amount = 0
+            if amount >= 10:
+                yizi_candidates.append({
+                    "code": s["代码"], "name": s["名称"],
+                    "boards": s["连板数"],
+                    "amount_yi": amount,
+                    "industry": s.get("所属行业", ""),
+                    "reason": f"一字板 封单{amount:.0f}亿 [{s.get('所属行业', '')}]"
+                })
+    board_counts = Counter(s["industry"] for s in yizi_candidates)
+    has_cluster = any(c >= 3 for c in board_counts.values())
+    has_big = any(s.get("amount_yi", 0) >= 30 for s in yizi_candidates)
+    newtheme_score = 0.0
+    if has_big:
+        newtheme_score += 0.5
+    if has_cluster:
+        newtheme_score += 0.5
+    results.append({
+        "mode": "新题材同身位", "score": newtheme_score,
+        "candidates": yizi_candidates[:5],
+        "buy_point": "有一字做首个换手打板",
+        "sell_point": "次日一字封单减少则走", "position": "3层以下",
+    })
+
+    # 模式4: 补涨
+    buzhang_candidates = []
+    for s in ladder:
+        if s["连板数"] < space and s["连板数"] >= 2:
+            buzhang_candidates.append({
+                "code": s["代码"], "name": s["名称"],
+                "boards": s["连板数"],
+                "reason": f"{s['连板数']}板 低于空间{space}板（补涨候选）"
+            })
+    buzhang_candidates.sort(key=lambda x: -x["boards"])
+    buzhang_score = min(1.0, len(buzhang_candidates) / 3) if space >= 5 else 0
+    results.append({
+        "mode": "补涨", "score": buzhang_score,
+        "candidates": buzhang_candidates[:5],
+        "buy_point": "龙头断板当天做补涨",
+        "sell_point": "次日强转弱则走", "position": "3层",
+    })
+
+    return results
+
+
+def _assemble_result(gate: dict, modes: list[dict], llm_result: dict | None) -> dict:
+    """组装三层决策最终结果。"""
+    triggered_modes = []
+    for m in modes:
+        if m["score"] > 0 and m["candidates"]:
+            triggered_modes.append({
+                "mode": m["mode"], "triggered": True,
+                "candidates": m["candidates"],
+                "buy_point": m["buy_point"],
+                "sell_point": m["sell_point"],
+                "position": m["position"],
+            })
+
+    result = {
+        "is_signal": gate["is_signal"],
+        "is_continuation": gate["is_continuation"],
+        "signal_reason": gate["reason"],
+        "continuation_reason": (
+            f"起变信号后883958仍维持{gate.get('premium_pct', 0)}%溢价，延续行情"
+            if gate["is_continuation"] else ""
+        ),
+        "cycle_type": "接力" if gate["is_signal"] or gate["is_continuation"] else "未知",
+        "modes": triggered_modes,
+        "summary": "",
+        "gate_reason": gate["reason"],
+        "mode_scores": {m["mode"]: m["score"] for m in modes},
+    }
+
+    if llm_result:
+        result["summary"] = llm_result.get("summary", "")
+        if llm_result.get("signal_reason"):
+            result["signal_reason"] = llm_result["signal_reason"]
+        if llm_result.get("cycle_type"):
+            result["cycle_type"] = llm_result["cycle_type"]
+        result["confidence"] = llm_result.get("confidence", 0.8)
+    else:
+        if gate["is_signal"]:
+            result["summary"] = "起变信号出现，关注4种模式机会。"
+        elif gate["is_continuation"]:
+            result["summary"] = f"延续信号触发：{result['continuation_reason']}"
+        else:
+            result["summary"] = "未满足起变信号条件。"
+        result["confidence"] = 1.0 if gate["is_signal"] else 0.5
+
+    return result
+
+
+AI_ADJUDICATE_PROMPT = """你是A股短线情绪交易员。程序已完成硬门控和模式评分，请对边界案例做裁决。
+
+【硬门控结果】
+{gate}
+
+【模式评分与候选】
+{modes}
 
 【竞价表历史（近15行）】
 {bidding}
 
-【当日证据】
-{evidence}
-"""
+策略规范（单一事实来源）：
+{spec}
+
+请对以上评分和候选做可读解释与排序（150字内），输出JSON：
+{{
+  "recommended_modes": ["模式名"],
+  "signal_reason": "补充判断理由",
+  "summary": "总结与操作建议（150字内）",
+  "confidence": 0.8,
+  "cycle_type": "接力/趋势/混沌"
+}}
+只返回JSON。"""
+
+REVIEW_PROMPT_SHORT = """你是A股短线复核员。程序已完成硬门控和模式评分，请根据**同一份数据**独立裁决。
+这是对抗式复核——你不知道第一模型的结论。
+
+【硬门控结果】
+{gate}
+
+【模式评分与候选】
+{modes}
+
+请独立判断并输出JSON：
+{{
+  "recommended_modes": ["模式名"],
+  "signal_reason": "独立判断理由",
+  "summary": "独立操作建议（150字内）",
+  "confidence": 0.8,
+  "cycle_type": "接力/趋势/混沌"
+}}
+策略规范（单一事实来源）：
+{spec}
+
+重点：1)哪些模式候选证据不足？2)有什么反例？3)是否应弃权？
+只返回JSON。"""
+
+
+def _parse_llm_json(raw: str) -> dict | None:
+    """解析 LLM 返回的 JSON，去除 markdown 包裹。"""
+    raw = raw.strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+def _llm_adjudicate(evidence: dict, gate: dict, modes: list[dict]) -> dict | None:
+    """第三层：LLM 裁决边界案例（含双阶段复核）。"""
+    bidding = _load_bidding_history()
+    gate_text = gate["reason"]
+    mode_lines = []
+    for m in modes:
+        if m["score"] > 0:
+            mode_lines.append(f"  {m['mode']} (score={m['score']:.1f})")
+            for c in m.get("candidates", []):
+                mode_lines.append(f"    - {c['name']}({c['code']}) "
+                                  f"{c.get('boards', '?')}板 {c.get('reason', '')}")
+    modes_text = "\n".join(mode_lines) if mode_lines else "  无触发模式"
+
+    spec_text = load_spec_text(SHORT_SPEC)
+    prompt = AI_ADJUDICATE_PROMPT.format(gate=gate_text, modes=modes_text,
+                                         bidding=bidding, spec=spec_text)
+    review_prompt = REVIEW_PROMPT_SHORT.format(gate=gate_text, modes=modes_text,
+                                               spec=spec_text)
+
+    from src.llm_gateway import call_llm
+
+    def _call(model: str, llm_prompt: str) -> dict | None:
+        try:
+            raw = call_llm(
+                prompt=llm_prompt,
+                model=model,
+                temperature=0.2,
+                max_tokens=400,
+                timeout=30.0,
+                retries=0,
+            )
+            if raw is None:
+                return None
+            return _parse_llm_json(raw)
+        except Exception as e:
+            logger.warning("LLM 裁决失败 (%s): %s", model, e)
+            return None
+
+    # Stage 1: qwen-plus 初判
+    stage1 = None
+    for _model in ("qwen-plus", cfg.QWEN_CHAT_MODEL):
+        stage1 = _call(_model, prompt)
+        if stage1:
+            break
+    if stage1 is None:
+        return None
+
+    # 双阶段复核：低置信触发
+    confidence = stage1.get("confidence", 0.5)
+    try:
+        confidence = float(confidence)
+    except (TypeError, ValueError):
+        confidence = 0.5
+
+    if confidence >= 0.6:
+        return stage1
+
+    logger.info("短线决策低置信(%.2f)，触发双阶段复核", confidence)
+    stage2 = _call(cfg.QWEN_CHAT_MODEL, review_prompt)
+    if stage2 is None:
+        return stage1
+
+    # 比较 recommended_modes
+    modes1 = set(stage1.get("recommended_modes", []))
+    modes2 = set(stage2.get("recommended_modes", []))
+    agreed = bool(modes1 & modes2) if modes1 and modes2 else False
+
+    result = {**stage1, "reviewed": True, "agreed": agreed}
+    if not agreed:
+        result["recommended_modes"] = list(modes1 & modes2) if modes1 & modes2 else list(modes1)
+        result["confidence"] = min(confidence, float(stage2.get("confidence", 0.5)))
+        result["review_reason"] = "两阶段推荐模式分歧，取交集并降置信"
+    else:
+        result["review_note"] = f"双阶段一致：{list(modes1 & modes2)}"
+
+    return result
 
 
 def _load_bidding_history(n: int = 15) -> str:
@@ -528,6 +846,11 @@ def _evidence_to_text(ev: dict) -> str:
     wp = ev.get("weipan_883418", {})
     lines.append(f"883418微盘股: 涨跌幅={wp.get('change_pct', 0)}% "
                  f"安全(不深跌)={'是' if wp.get('safe') else '否'}")
+    cont = ev.get("continuation_883958", {})
+    if cont.get("yesterday_signal_date"):
+        lines.append(f"延续信号检测: 起变日期={cont['yesterday_signal_date']} "
+                     f"今日883958溢价={cont.get('premium_pct', 0)}% "
+                     f"延续触发={'是' if cont.get('triggered') else '否'}")
     lines.append(f"涨停池总数: {ev.get('ladder_count', 0)}只")
     lines.append("连板天梯(前20):")
     for s in ev.get("ladder_summary", []):
@@ -539,69 +862,27 @@ def _evidence_to_text(ev: dict) -> str:
 
 
 def ai_judge(evidence: dict) -> dict:
-    """Qwen 大模型判断起变信号 + 模式触发。
+    """三层决策：硬门控 → 特征评分 → LLM 裁决。
 
-    返回 {is_signal, signal_reason, cycle_type, modes[], summary}
-    失败时回退到规则判断。
+    返回 {is_signal, is_continuation, signal_reason, continuation_reason,
+          cycle_type, modes[], summary, gate_reason, mode_scores, confidence}
     """
-    spec = SHORT_SPEC.read_text(encoding="utf-8") if SHORT_SPEC.exists() else ""
-    bidding = _load_bidding_history()
-    ev_text = _evidence_to_text(evidence)
-
-    # 规则回退判断
-    def _rule_fallback() -> dict:
-        lb = evidence.get("lianban_883958", {})
-        wp = evidence.get("weipan_883418", {})
-        is_sig = (evidence["space"] > 4
-                  and lb.get("triggered", False)
-                  and wp.get("safe", True))
-        triggered_modes = []
-        if is_sig:
-            for m in MODES_DEF:
-                triggered_modes.append({
-                    "mode": m["mode"], "triggered": True,
-                    "candidates": [],
-                    "buy_point": m["buy_point"],
-                    "sell_point": m["sell_point"],
-                    "position": m["position"],
-                })
-        return {
-            "is_signal": is_sig,
-            "signal_reason": "（规则回退）" + (
-                "连板空间>4板且高度板非一字且883958触发且微盘股安全" if is_sig
-                else "未满足起变信号条件"),
-            "cycle_type": "接力" if is_sig else "未知",
-            "modes": triggered_modes,
-            "summary": "规则回退判断，模型调用失败。" if not is_sig
-                       else "起变信号出现，关注4种模式机会。",
-        }
+    gate = hard_gate(evidence)
+    modes = score_modes(evidence) if gate["is_signal"] else []
 
     if not cfg.QWEN_API_KEY:
-        return _rule_fallback()
+        return _assemble_result(gate, modes, None)
 
-    from openai import OpenAI
-    client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
-    prompt = AI_PROMPT.format(spec=spec, bidding=bidding, evidence=ev_text)
+    needs_llm = any(0.3 < m["score"] < 0.7 for m in modes)
 
-    # qwen-plus 优先（快且质量好），失败回退3.7-max
-    for _model in ("qwen-plus", cfg.QWEN_CHAT_MODEL):
-        try:
-            resp = client.chat.completions.create(
-                model=_model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=600)
-            raw = resp.choices[0].message.content.strip()
-            raw = re.sub(r"^```(?:json)?\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
-            result = json.loads(raw)
-            if "modes" in result:
-                result["modes"] = [m for m in result["modes"] if m.get("triggered")]
-            return result
-        except Exception as e:
-            logger.warning("AI (%s) 起变信号判读失败: %s", _model, e)
-            continue
-    return _rule_fallback()
+    if not needs_llm and gate["is_signal"]:
+        return _assemble_result(gate, modes, None)
+
+    if not gate["is_signal"] and not gate["is_continuation"]:
+        return _assemble_result(gate, modes, None)
+
+    llm_result = _llm_adjudicate(evidence, gate, modes)
+    return _assemble_result(gate, modes, llm_result)
 
 
 # ── 轻量扫描（K线标记用）──────────────────────────────────────────────────
@@ -639,6 +920,22 @@ def _detect_raw(date_str: str) -> dict:
     """
     evidence = build_evidence(date_str)
     ai_result = ai_judge(evidence)
+    try:
+        from src import predictions as _pred
+        if ai_result.get("is_signal"):
+            _pred.append_prediction(
+                type="shortterm", date=date_str, signal="起变",
+                confidence=ai_result.get("confidence", 1.0),
+                evidence_snapshot=[{"reason": ai_result.get("signal_reason", "")}],
+            )
+        elif ai_result.get("is_continuation"):
+            _pred.append_prediction(
+                type="shortterm", date=date_str, signal="延续",
+                confidence=ai_result.get("confidence", 0.8),
+                evidence_snapshot=[{"reason": ai_result.get("continuation_reason", "")}],
+            )
+    except Exception:
+        pass
     ladder = get_ladder(date_str)
     scan_marks = scan_signals("883958", days=120)
     return {
@@ -655,12 +952,16 @@ def detect(date_str: str) -> dict:
 
     起变信号一旦触发，在同一883958周期内不重复出现。
     当883958经历新一轮"连阴→跳空高开拉红"后周期重置。
+    延续信号不受去重影响，独立展示。
     """
     result = _detect_raw(date_str)
     ai_result = result.get("ai_result", {})
     evidence = result.get("evidence", {})
+    is_cont = ai_result.get("is_continuation", False)
+    cont_reason = ai_result.get("continuation_reason", "")
 
     if not ai_result.get("is_signal"):
+        # 无起变信号，但可能有延续信号——保留延续信息
         return result
 
     state = _load_signal_state()
@@ -688,11 +989,15 @@ def detect(date_str: str) -> dict:
         _save_signal_state({"signal_date": date_str, "lianban_trigger_date": current_lb})
         return result
 
+    # 起变信号被去重，但保留延续信号信息
     ai_result["is_signal"] = False
     ai_result["signal_reason"] = f"已于 {cached_date} 起变"
     ai_result["modes"] = []
-    ai_result["summary"] = (
+    base_summary = (
         f"起变信号已于 {cached_date} 触发，当前仍处于同一周期，"
         f"等待883958连板指数新一轮连阴→跳空高开拉红后再关注。"
     )
+    if is_cont and cont_reason:
+        base_summary += f"\n【延续信号】{cont_reason}"
+    ai_result["summary"] = base_summary
     return result

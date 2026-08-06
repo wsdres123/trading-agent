@@ -341,72 +341,87 @@ def detect(start: str, end: str, min_ret30: float = MIN_RET30_PCT,
             "turnover_idx": idx_df}
 
 
-# ── AI 主线判断（大模型为最终判断者）──────────────────────────────────────
-AI_PROMPT = """你是A股主线题材研究员。请先学习【主线筛选规范】（theme_spec.md），
-再结合【规则初筛证据】，对 {start} ~ {end} 的主线情况给出最终判断，250字内，中文口语化。
+# ── 主线有效性评分（程序层）────────────────────────────────────────────────
+def score_mainline(mainlines: list[dict]) -> list[dict]:
+    """主线有效性数值评分。程序完成事实判断，不依赖模型。"""
+    scored = []
+    for ml in mainlines:
+        streak_ratio = ml["days"] / max(MIN_STREAK, 1)
+        count_ratio = ml["max_count"] / max(MIN_BOARD_STOCKS, 1)
+        gate_bonus = 0.2 if ml.get("gate_open") else 0
+        core_bonus = min(0.3, len(ml.get("core", [])) * 0.1)
+        ongoing_bonus = 0.1 if ml.get("ongoing") else 0
 
-硬性规则：
-- 主线是唯一的：最多只能认定一个主线板块（可附带关联板块）。
-- 主线必须是某一个具体板块（如半导体、机器人、光通信），不能是泛泛的大类
-  （如电子、人工智能、新能源、科技这类宽泛名称）。
-- B周期、D周期不可能有主线；初筛证据中标注了每日中级周期，B/D日的板块强度不能作为主线依据。
+        total = min(1.0, (streak_ratio * 0.3 + count_ratio * 0.2
+                          + gate_bonus + core_bonus + ongoing_bonus))
+        scored.append({**ml, "validity_score": round(total, 2)})
+    scored.sort(key=lambda x: -x["validity_score"])
+    return scored
 
-输出必须包含：
-1) 有无主线及唯一主线板块名（含关联板块说明）；2) 趋势核心（阵眼）点评；
-3) 趋势补涨机会点评；4) 按规范给出当前操作建议（含卖点提示）。
-若判断无主线，说明原因并给出观察建议。
+
+# ── AI 主线判断（LLM 只做解释与建议）──────────────────────────────────────
+AI_PROMPT_THEME = """你是A股主线题材研究员。程序已完成主线识别与有效性评分，请解释评分并给出操作建议（250字内，中文口语化）。
+
+硬性规则（已由程序执行，无需重复判断）：
+- B/D周期日不计入主线连续强天数
+- 主线必须是具体板块（非泛泛大类如电子/人工智能）
+- 主线唯一，其余为关联或次强板块
+
+【程序评分结果】
+{scored}
 
 【主线筛选规范】
 {spec}
 
-【规则初筛证据】
-{result}
-"""
+请输出：1) 主线有效性解读；2) 趋势核心点评；3) 操作建议（含卖点）。"""
 
 
 def ai_analyze(result: dict) -> str:
     if not cfg.QWEN_API_KEY:
-        return "未配置 QWEN_API_KEY"
+        if result.get("has_mainline"):
+            scored = score_mainline(result["mainlines"])
+            lines = []
+            for ml in scored[:3]:
+                core = "、".join(f"{s['名称']}" for s in ml["core"]) or "无"
+                lines.append(f"主线[{ml['board']}] 有效性={ml['validity_score']:.2f} "
+                             f"连续{ml['days']}天 核心={core}")
+            return "\n".join(lines)
+        return "未识别主线板块。"
+
     spec = THEME_SPEC.read_text(encoding="utf-8") if THEME_SPEC.exists() else ""
-    lines = []
+
     if result.get("has_mainline"):
-        for ml in result["mainlines"][:5]:
+        scored = score_mainline(result["mainlines"])
+        lines = []
+        for ml in scored[:5]:
             core = "、".join(f"{s['名称']}({s['最大成交额_亿']}亿)" for s in ml["core"]) or "无"
             follow = "、".join(s["名称"] for s in ml["follow"][:10]) or "无"
-            lines.append(f"唯一主线[{ml['board']}] {ml['start']}~{ml['end']} 连续{ml['days']}天"
+            lines.append(f"主线[{ml['board']}] validity={ml['validity_score']:.2f} "
+                         f"{ml['start']}~{ml['end']} 连续{ml['days']}天"
                          f"{'（进行中）' if ml['ongoing'] else '（已结束）'}，"
-                         f"峰值{ml['max_count']}只；趋势核心：{core}；趋势补涨：{follow}")
+                         f"峰值{ml['max_count']}只；核心：{core}；补涨：{follow}")
             if ml.get("related"):
-                _rel = ml["related"]
-                lines.append(f"关联板块（与主线成员重叠，共{len(_rel)}个）："
-                             f"{'、'.join(_rel[:8])}{'等' if len(_rel) > 8 else ''}")
+                lines.append(f"关联板块：{'、'.join(ml['related'][:8])}")
             if ml.get("secondary"):
-                lines.append(f"次强板块（非主线）：{'、'.join(ml['secondary'])}")
+                lines.append(f"次强板块：{'、'.join(ml['secondary'])}")
     else:
-        lines.append("区间内未识别出满足条件的主线板块（注意：B/D周期不可能有主线）。")
-    lines.append(f"成交前10指数(同花顺883902)上升趋势：{result.get('gate_open_days', 0)}/"
-                 f"{result.get('gate_total_days', 0)} 日上升。该指数为开启参考："
-                 "上升趋势更支持主线有效，下行时主线质量打折，但不直接否决主线。")
-    for ml in result.get("mainlines", [])[:5]:
-        lines.append(f"主线[{ml['board']}] 区间成交前10指数门槛："
-                     f"{'开启(上升趋势)' if ml.get('gate_open') else '未开启(下行)'}")
-    tail = result.get("daily")
-    if tail is not None and not tail.empty:
-        lines.append("最近10日强板块（含中级周期，B/D日不能作为主线依据）：")
-        for _, r in tail.tail(10).iterrows():
-            lines.append(f"{r['日期']} 周期[{r.get('周期', '-')}] "
-                         f"候选{r['候选数']}只 {r['强板块'] or '-'}")
+        lines = ["区间内未识别主线板块。"]
+
+    lines.append(f"上升趋势天数：{result.get('gate_open_days', 0)}/"
+                 f"{result.get('gate_total_days', 0)}")
+
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
-        resp = client.chat.completions.create(
+        from src.llm_gateway import call_llm
+        raw = call_llm(
+            prompt=AI_PROMPT_THEME.format(scored="\n".join(lines), spec=spec),
             model=cfg.QWEN_PLUS_MODEL,
-            messages=[{"role": "user", "content": AI_PROMPT.format(
-                start=result.get("start", ""), end=result.get("end", ""),
-                spec=spec, result="\n".join(lines))}],
             temperature=0.2,
-            extra_body={"enable_thinking": False})
-        return resp.choices[0].message.content.strip()
+            max_tokens=800,
+            timeout=30.0,
+            retries=0,
+            extra_body={"enable_thinking": False},
+        )
+        return raw if raw is not None else "AI 主线判读失败"
     except Exception as e:
         logger.error("AI 主线判读失败：%s", e)
         return f"AI 判读失败：{e}"

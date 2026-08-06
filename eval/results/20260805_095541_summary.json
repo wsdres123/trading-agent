@@ -1,0 +1,1677 @@
+{
+  "timestamp": "2026-08-05 09:54:55",
+  "modules": [
+    {
+      "name": "数据准确性",
+      "result": {
+        "pass": 5,
+        "fail": 0,
+        "details": [
+          {
+            "test": "全市场快照字段完整性",
+            "status": "pass"
+          },
+          {
+            "test": "指数涨跌幅合理性",
+            "status": "pass"
+          },
+          {
+            "test": "日K线连续性",
+            "status": "pass"
+          },
+          {
+            "test": "热榜数据可用性",
+            "status": "pass"
+          },
+          {
+            "test": "Redis缓存读写",
+            "status": "pass"
+          }
+        ]
+      },
+      "elapsed_s": 17.36,
+      "status": "ok"
+    },
+    {
+      "name": "输出可靠性",
+      "result": {
+        "pass": 1,
+        "fail": 193,
+        "timing_total": 88,
+        "timing_valid": 0,
+        "emotion_total": 106,
+        "emotion_valid": 1,
+        "issues_sample": [
+          {
+            "date": "2026-07-28",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-07-29",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-07-30",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-07-31",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-08-01",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-08-03",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-03-30",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-03-31",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-04-01",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          },
+          {
+            "date": "2026-04-02",
+            "type": "timing",
+            "issues": [
+              "缺失字段 evidence",
+              "缺失字段 confidence",
+              "confidence 越界: -1"
+            ]
+          }
+        ],
+        "schema_validity_rate": 0.5,
+        "note": "审计 194 条预测（timing 88 + emotion 106），schema 合法率 0.5%"
+      },
+      "elapsed_s": 0.0,
+      "status": "ok"
+    },
+    {
+      "name": "情绪节点",
+      "result": {
+        "total": 103,
+        "matched": 103,
+        "correct": 31,
+        "wrong": 72,
+        "pass": 31,
+        "fail": 72,
+        "node_distribution": {
+          "修复--中等": 21,
+          "混沌分歧": 13,
+          "冰点": 12,
+          "混沌": 9,
+          "日内分歧转一致": 8,
+          "修复--弱": 8,
+          "退潮": 7,
+          "修复--强": 5,
+          "主升--分歧": 4,
+          "修复延续": 3,
+          "加速转衰竭": 3,
+          "主升--延续": 3,
+          "主升--加速": 2,
+          "龙头确认": 1,
+          "加速": 1,
+          "小退潮": 1,
+          "主升--确认": 1,
+          "主升--高潮": 1
+        },
+        "details": [
+          {
+            "date": "2026-02-13",
+            "expected": "退潮",
+            "ai": "退潮",
+            "status": "pass"
+          },
+          {
+            "date": "2026-02-24",
+            "expected": "退潮",
+            "ai": "退潮加速",
+            "status": "pass"
+          },
+          {
+            "date": "2026-02-25",
+            "expected": "修复--中等",
+            "ai": "修复--弱",
+            "status": "fail"
+          },
+          {
+            "date": "2026-02-26",
+            "expected": "龙头确认",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-02-27",
+            "expected": "加速",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-02",
+            "expected": "主升--分歧",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-03",
+            "expected": "冰点",
+            "ai": "退潮加速",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-04",
+            "expected": "退潮",
+            "ai": "退潮",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-05",
+            "expected": "修复--中等",
+            "ai": "修复--弱",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-06",
+            "expected": "修复延续",
+            "ai": "修复--中等",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-09",
+            "expected": "日内分歧转一致",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-10",
+            "expected": "混沌分歧",
+            "ai": "日内分歧转一致",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-11",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-12",
+            "expected": "日内分歧转一致",
+            "ai": "修复--弱",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-13",
+            "expected": "退潮",
+            "ai": "退潮",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-16",
+            "expected": "混沌分歧",
+            "ai": "修复--中等",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-17",
+            "expected": "修复--弱",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-18",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-19",
+            "expected": "混沌分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-20",
+            "expected": "混沌分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-23",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-24",
+            "expected": "修复--强",
+            "ai": "修复--强",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-25",
+            "expected": "主升--加速",
+            "ai": "修复--中等",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-26",
+            "expected": "主升--分歧",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-03-27",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-30",
+            "expected": "小退潮",
+            "ai": "退潮",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-31",
+            "expected": "修复--弱",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-01",
+            "expected": "混沌",
+            "ai": "修复--中等",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-02",
+            "expected": "混沌",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-03",
+            "expected": "混沌分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-07",
+            "expected": "修复--中等",
+            "ai": "修复--强",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-08",
+            "expected": "修复延续",
+            "ai": "主升--加速",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-09",
+            "expected": "混沌分歧",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-10",
+            "expected": "修复--弱",
+            "ai": "主升--分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-13",
+            "expected": "修复--弱",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-14",
+            "expected": "修复--强",
+            "ai": "修复--弱",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-15",
+            "expected": "加速转衰竭",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-16",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-17",
+            "expected": "日内分歧转一致",
+            "ai": "主升--延续",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-20",
+            "expected": "主升--加速",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-21",
+            "expected": "退潮",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-22",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-23",
+            "expected": "混沌分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-24",
+            "expected": "混沌分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-27",
+            "expected": "修复--弱",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-28",
+            "expected": "混沌",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-29",
+            "expected": "修复--中等",
+            "ai": "修复--强",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-30",
+            "expected": "混沌",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-06",
+            "expected": "修复--强",
+            "ai": "修复--强",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-07",
+            "expected": "日内分歧转一致",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-08",
+            "expected": "主升--分歧",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-11",
+            "expected": "修复--中等",
+            "ai": "主升--分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-12",
+            "expected": "日内分歧转一致",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-13",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-14",
+            "expected": "退潮",
+            "ai": "退潮",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-15",
+            "expected": "修复--中等",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-18",
+            "expected": "混沌",
+            "ai": "主升--分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-19",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-20",
+            "expected": "混沌分歧",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-21",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-22",
+            "expected": "修复--中等",
+            "ai": "修复--强",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-25",
+            "expected": "修复延续",
+            "ai": "混沌",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-26",
+            "expected": "日内分歧转一致",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-27",
+            "expected": "混沌分歧",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-28",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-29",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-01",
+            "expected": "修复--弱",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-02",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-03",
+            "expected": "主升--确认",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-04",
+            "expected": "混沌",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-05",
+            "expected": "混沌",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-08",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-09",
+            "expected": "修复--中等",
+            "ai": "修复--强",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-10",
+            "expected": "混沌分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-11",
+            "expected": "混沌分歧",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-12",
+            "expected": "修复--弱",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-15",
+            "expected": "修复--中等",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-16",
+            "expected": "日内分歧转一致",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-17",
+            "expected": "日内分歧转一致",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-18",
+            "expected": "主升--延续",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-22",
+            "expected": "主升--高潮",
+            "ai": "主升--确认",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-23",
+            "expected": "主升--分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-24",
+            "expected": "修复--强",
+            "ai": "修复--弱",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-25",
+            "expected": "主升--延续",
+            "ai": "主升--分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-26",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-29",
+            "expected": "修复--中等",
+            "ai": "主升--延续",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-30",
+            "expected": "主升--延续",
+            "ai": "修复--中等",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-01",
+            "expected": "加速转衰竭",
+            "ai": "主升--延续",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-02",
+            "expected": "退潮",
+            "ai": "退潮加速",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-03",
+            "expected": "混沌",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-06",
+            "expected": "混沌分歧",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-07",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-08",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-09",
+            "expected": "修复--强",
+            "ai": "修复--中等",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-10",
+            "expected": "加速转衰竭",
+            "ai": "混沌分歧",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-13",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-14",
+            "expected": "修复--中等",
+            "ai": "修复--中等",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-15",
+            "expected": "混沌",
+            "ai": "混沌分歧",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-16",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-17",
+            "expected": "冰点",
+            "ai": "退潮",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-29",
+            "expected": "修复--弱",
+            "ai": "弱修复",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-30",
+            "expected": "冰点",
+            "ai": "冰点",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-31",
+            "expected": "修复--中等",
+            "ai": "中等修复",
+            "status": "pass"
+          }
+        ],
+        "accuracy": 0.30097087378640774,
+        "accuracy_note": "AI缓存匹配 103/103 天，准确率 30.1%（目标 60%）。覆盖天数随每日运行自动增长。"
+      },
+      "elapsed_s": 0.01,
+      "status": "ok"
+    },
+    {
+      "name": "指数择时",
+      "result": {
+        "total": 100,
+        "matched_signal": 82,
+        "correct_signal": 56,
+        "matched_cycle": 82,
+        "correct_cycle": 46,
+        "pass": 102,
+        "fail": 62,
+        "signal_distribution": {
+          "空": 52,
+          "多": 26,
+          "转": 22
+        },
+        "details": [
+          {
+            "date": "2026-03-30",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "龙头A",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-03-31",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-01",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-10",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-13",
+            "expected_signal": "多",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "B",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-14",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-15",
+            "expected_signal": "转",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "趋势A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-16",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-17",
+            "expected_signal": "多",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-02",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-20",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-21",
+            "expected_signal": "转",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "趋势A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-22",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-23",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-24",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "趋势A",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-27",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "B",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-28",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-29",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-03",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-30",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-07",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-04-08",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "B",
+            "status": "fail"
+          },
+          {
+            "date": "2026-04-09",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-11",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-12",
+            "expected_signal": "转",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-13",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-14",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "fail"
+          },
+          {
+            "date": "2026-05-15",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-18",
+            "expected_signal": "多",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-19",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "B",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-20",
+            "expected_signal": "多",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-21",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-22",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "B",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-25",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-26",
+            "expected_signal": "转",
+            "ai_signal": "多",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-27",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-28",
+            "expected_signal": "转",
+            "ai_signal": "多",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-29",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-06",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-07",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-05-08",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-01",
+            "expected_signal": "空",
+            "ai_signal": "转",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-10",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-11",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-12",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-15",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "B",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-16",
+            "expected_signal": "转",
+            "ai_signal": "转",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "趋势A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-17",
+            "expected_signal": "转",
+            "ai_signal": "转",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "趋势A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-18",
+            "expected_signal": "多",
+            "ai_signal": "转",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "趋势A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-02",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-22",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "趋势A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-23",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "B",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-24",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-25",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-26",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "fail"
+          },
+          {
+            "date": "2026-06-29",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "趋势A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-03",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-30",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-04",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-05",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-08",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-06-09",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-01",
+            "expected_signal": "多",
+            "ai_signal": "多",
+            "expected_cycle": "趋势A",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-10",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "A",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-13",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-14",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-15",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-16",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-17",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-02",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "A",
+            "status": "fail"
+          },
+          {
+            "date": "2026-07-20",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-21",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-22",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-23",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-24",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "D",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-27",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-28",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-29",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-03",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-30",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-31",
+            "expected_signal": "空",
+            "ai_signal": "空",
+            "expected_cycle": "B",
+            "ai_cycle": "B",
+            "status": "pass"
+          },
+          {
+            "date": "2026-07-06",
+            "expected_signal": "转",
+            "ai_signal": "空",
+            "expected_cycle": "D",
+            "ai_cycle": "B",
+            "status": "fail"
+          }
+        ],
+        "accuracy": 0.6219512195121952,
+        "signal_accuracy": 0.6829268292682927,
+        "cycle_accuracy": 0.5609756097560976,
+        "note": "AI缓存匹配 82/100 天。信号准确率 68.3%(56/82)，周期准确率 56.1%(46/82)。"
+      },
+      "elapsed_s": 0.0,
+      "status": "ok"
+    },
+    {
+      "name": "筛选NLP解析",
+      "result": {
+        "total": 35,
+        "correct": 34,
+        "accuracy": 0.9714,
+        "pass": 34,
+        "fail": 1,
+        "details": [
+          {
+            "input": "收盘价大于5日均线且30天涨幅大于40%属于半导体板块",
+            "status": "fail",
+            "reason": "漏解析: [{'field': 'return_ndays', 'days': 30, 'min_pct': 40}]",
+            "actual": [
+              {
+                "field": "close_gt_ma",
+                "ma": 5
+              },
+              {
+                "field": "return_ndays",
+                "days": 5,
+                "min_pct": 40.0
+              },
+              {
+                "field": "sector",
+                "name": "半导体"
+              }
+            ]
+          }
+        ]
+      },
+      "elapsed_s": 1.54,
+      "status": "ok"
+    },
+    {
+      "name": "RAG检索质量",
+      "result": {
+        "total": 108,
+        "correct": 105,
+        "recall_accuracy": 0.9722,
+        "pass": 105,
+        "fail": 3,
+        "details": [
+          {
+            "query": "打板大面对情绪的影响",
+            "status": "fail",
+            "recall": 0.25,
+            "missed": [
+              "打板大面",
+              "质量",
+              "打折"
+            ]
+          },
+          {
+            "query": "前日大面低基数怎么判断节点",
+            "status": "fail",
+            "recall": 0.25,
+            "missed": [
+              "低基数",
+              "绝对值",
+              "混沌"
+            ]
+          },
+          {
+            "query": "情绪节点判断的时间点",
+            "status": "fail",
+            "recall": 0.25,
+            "missed": [
+              "14:57",
+              "尾盘",
+              "每日"
+            ]
+          }
+        ]
+      },
+      "elapsed_s": 26.32,
+      "status": "ok"
+    },
+    {
+      "name": "性能基准",
+      "result": {
+        "pass": 7,
+        "fail": 0,
+        "benchmarks": [
+          {
+            "name": "get_stock_spot (Redis命中)",
+            "avg_ms": 3.2,
+            "threshold_ms": 200,
+            "status": "pass"
+          },
+          {
+            "name": "get_index_spot (Redis命中)",
+            "avg_ms": 0.7,
+            "threshold_ms": 200,
+            "status": "pass"
+          },
+          {
+            "name": "get_hot_stocks (Redis命中)",
+            "avg_ms": 35.5,
+            "threshold_ms": 100,
+            "status": "pass"
+          },
+          {
+            "name": "get_stock_quote_fast",
+            "avg_ms": 21.7,
+            "threshold_ms": 500,
+            "status": "pass"
+          },
+          {
+            "name": "knowledge.search",
+            "avg_ms": 235.5,
+            "threshold_ms": 3000,
+            "status": "pass"
+          },
+          {
+            "name": "parse_filter_conditions (本地关键字)",
+            "avg_ms": 0.1,
+            "threshold_ms": 50,
+            "status": "pass"
+          },
+          {
+            "name": "redis_set + redis_get",
+            "avg_ms": 0.3,
+            "threshold_ms": 10,
+            "status": "pass"
+          }
+        ]
+      },
+      "elapsed_s": 0.89,
+      "status": "ok"
+    },
+    {
+      "name": "真实交易质量",
+      "result": {
+        "pass": 1,
+        "fail": 0,
+        "total": 1,
+        "timing": {
+          "total": 0,
+          "evaluated": 0,
+          "d1": {
+            "hits": 0,
+            "total": 0,
+            "rate": 0.0
+          },
+          "d3": {
+            "hits": 0,
+            "total": 0,
+            "rate": 0.0
+          },
+          "d5": {
+            "hits": 0,
+            "total": 0,
+            "rate": 0.0
+          }
+        },
+        "emotion": {
+          "total": 0,
+          "evaluated": 0,
+          "d1": {
+            "returns": [],
+            "avg": 0.0
+          },
+          "d3": {
+            "returns": [],
+            "avg": 0.0
+          },
+          "d5": {
+            "returns": [],
+            "avg": 0.0
+          }
+        },
+        "shortterm": {
+          "total": 1,
+          "evaluated": 1,
+          "d1": {
+            "returns": [
+              6.66
+            ],
+            "avg": 6.66,
+            "failure_rate": 0.0
+          },
+          "d3": {
+            "returns": [],
+            "avg": 0.0,
+            "failure_rate": 0.0
+          },
+          "d5": {
+            "returns": [],
+            "avg": 0.0,
+            "failure_rate": 0.0
+          }
+        },
+        "note": "共 1 条预测，timing 0 / emotion 0 / shortterm 1。已评估 1 条。"
+      },
+      "elapsed_s": 0.0,
+      "status": "ok"
+    }
+  ]
+}

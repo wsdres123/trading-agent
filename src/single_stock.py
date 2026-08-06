@@ -19,6 +19,7 @@ import pandas as pd
 
 from config import settings as cfg
 from src import data, stock_filter as sf
+from src.schema_validator import load_spec_text
 
 logger = logging.getLogger("single_stock")
 
@@ -359,6 +360,10 @@ def _enrich_from_cache(codes: list[str], date_str: str) -> pd.DataFrame:
 # ── AI 个股判断（精简prompt + qwen-turbo，目标3s内）───────────────────────
 AI_PROMPT = """A股个股判断。周期{cycle}。对以下候选给出买卖判断，只输出JSON：
 {{"zhuanggu":[{{"code":"代码","name":"名称","verdict":"可做/观察/回避","buy":"买点","sell":"卖点","risk":"风险","reason":"理由20字"}}],"mainline":[{{"code":"","name":"","type":"核心/补涨","verdict":"","buy":"","sell":"","reason":""}}],"shortterm":[{{"code":"","name":"","mode":"","verdict":"","buy":"","sell":"","reason":""}}],"summary":"总结100字"}}
+
+策略规范（单一事实来源）：
+{spec}
+
 规则：A/B/C弹个股D不弹。主线核心是阵眼补涨跟随，买卖点后续补充先给趋势判断。短线起变信号后才介入。庄股趋势不破盘中低吸，收盘破5日均线卖，优先独立趋势票。无候选返回空数组。
 庄股({n_zg}只):{zhuanggu}
 主线(核心{n_core}+补涨{n_follow},信号{signal}):{mainline}
@@ -413,8 +418,8 @@ def ai_judge(cycle: str, zhuanggu_df: pd.DataFrame,
     if not cfg.QWEN_API_KEY:
         return _fallback()
 
-    from openai import OpenAI
-    client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
+    from src.llm_gateway import call_llm
+    spec_text = load_spec_text(SPEC)
     prompt = AI_PROMPT.format(
         cycle=cycle or "未知",
         n_zg=len(zhuanggu_df) if zhuanggu_df is not None else 0,
@@ -422,14 +427,21 @@ def ai_judge(cycle: str, zhuanggu_df: pd.DataFrame,
         n_follow=len(ml_data.get("follow_raw", [])),
         n_st=len(st_data.get("all_codes", [])),
         signal=signal,
-        zhuanggu=zg_text, mainline=ml_text, shortterm=st_text)
+        zhuanggu=zg_text, mainline=ml_text, shortterm=st_text,
+        spec=spec_text)
 
     for _model in ("qwen-turbo", "qwen-plus", cfg.QWEN_CHAT_MODEL):
         try:
-            resp = client.chat.completions.create(
-                model=_model, messages=[{"role": "user", "content": prompt}],
-                temperature=0.1, max_tokens=500)
-            raw = resp.choices[0].message.content.strip()
+            raw = call_llm(
+                prompt=prompt,
+                model=_model,
+                temperature=0.1,
+                max_tokens=500,
+                timeout=30.0,
+                retries=0,
+            )
+            if raw is None:
+                continue
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
             return json.loads(raw)
@@ -450,6 +462,21 @@ def run(date_str: str | None = None) -> dict:
         date_str = date.today().strftime("%Y-%m-%d")
 
     cyc = current_cycle()
+
+    # D 周期程序级门控：规范声明仅在 A/B/C 周期弹个股，D 周期直接返回空
+    if "D" in cyc:
+        logger.info("D周期（%s）不弹个股，程序级门控返回空", cyc)
+        return {
+            "date": date_str,
+            "cycle": cyc,
+            "zhuanggu": pd.DataFrame(),
+            "mainline_display": pd.DataFrame(),
+            "mainline_data": {"has_mainline": False},
+            "shortterm_display": pd.DataFrame(),
+            "shortterm_data": {"all_codes": []},
+            "ai_result": {"error": "D周期不弹个股", "candidates": []},
+        }
+
     zhuanggu = screen_zhuanggu(date_str)
 
     # 主线：30天窗口 ending at date_str

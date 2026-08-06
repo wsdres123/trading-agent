@@ -1,0 +1,29 @@
+{
+  "total": 35,
+  "correct": 34,
+  "accuracy": 0.9714,
+  "pass": 34,
+  "fail": 1,
+  "details": [
+    {
+      "input": "收盘价大于5日均线且30天涨幅大于40%属于半导体板块",
+      "status": "fail",
+      "reason": "漏解析: [{'field': 'return_ndays', 'days': 30, 'min_pct': 40}]",
+      "actual": [
+        {
+          "field": "close_gt_ma",
+          "ma": 5
+        },
+        {
+          "field": "return_ndays",
+          "days": 5,
+          "min_pct": 40.0
+        },
+        {
+          "field": "sector",
+          "name": "半导体"
+        }
+      ]
+    }
+  ]
+}

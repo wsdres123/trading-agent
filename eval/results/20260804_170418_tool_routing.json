@@ -1,0 +1,34 @@
+{
+  "total": 5,
+  "correct": 5,
+  "pass": 5,
+  "fail": 0,
+  "details": [
+    {
+      "question": "今天上证涨了多少",
+      "status": "pass",
+      "called": "get_index_quote"
+    },
+    {
+      "question": "贵州茅台现在多少钱",
+      "status": "pass",
+      "called": "get_stock_quote"
+    },
+    {
+      "question": "半导体板块表现怎么样",
+      "status": "pass",
+      "called": "get_sector_quote"
+    },
+    {
+      "question": "今天大盘怎么样",
+      "status": "pass",
+      "called": "get_market_overview"
+    },
+    {
+      "question": "贵州茅台最近走势如何",
+      "status": "pass",
+      "called": "get_stock_history"
+    }
+  ],
+  "accuracy": 1.0
+}

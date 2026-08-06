@@ -144,14 +144,18 @@ def ai_deduce(force: bool = False) -> dict:
         for k, v in ctx.items())
     prompt = DEDUCE_PROMPT.format(today=today, context=ctx_lines)
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
-        resp = client.chat.completions.create(
+        from src.llm_gateway import call_llm
+        raw = call_llm(
+            prompt=prompt,
             model=cfg.QWEN_PLUS_MODEL,
-            messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
-            extra_body={"enable_thinking": False})
-        raw = resp.choices[0].message.content.strip()
+            max_tokens=800,
+            timeout=30.0,
+            retries=0,
+            extra_body={"enable_thinking": False},
+        )
+        if raw is None:
+            return {"error": "LLM 调用失败"}
         m = re.search(r"\{.*\}", raw, re.S)
         result = json.loads(m.group(0) if m else raw)
     except Exception as e:

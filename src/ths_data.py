@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
@@ -56,6 +55,20 @@ def health() -> bool:
         return bool(item)
     except Exception:
         return False
+
+
+def trade_calendar() -> list[str]:
+    """A股交易日历（近一年）。返回标准化 ["YYYY-MM-DD", ...] 列表，失败返回空 list。"""
+    data = _request("/a-share/calendar/trading-days", {})
+    items = data.get("item") if isinstance(data, dict) else None
+    if not items:
+        return []
+    dates = []
+    for it in items:
+        d = str(it.get("date", ""))
+        if len(d) == 8:
+            dates.append(f"{d[:4]}-{d[4:6]}-{d[6:8]}")
+    return sorted(dates)
 
 
 def _to_thscode(code6: str) -> str:

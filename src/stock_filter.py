@@ -7,9 +7,11 @@
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
-import time
+import os
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -543,36 +545,63 @@ def _load_groups() -> dict:
 
 
 def _save_groups(data_obj: dict) -> None:
-    cfg.GROUPS_FILE.write_text(json.dumps(data_obj, ensure_ascii=False, indent=2), encoding="utf-8")
+    """分组 JSON 文件锁 + 临时文件原子写，防止并发覆盖。"""
+    cfg.GROUPS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(cfg.GROUPS_FILE), os.O_RDWR | os.O_CREAT)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            dir=str(cfg.GROUPS_FILE.parent), suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(data_obj, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, cfg.GROUPS_FILE)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+            raise
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
-def list_groups() -> list:
-    return _load_groups().get("groups", [])
+def list_groups(username: str | None = None) -> list:
+    """列出分组。传入 username 时只返回该用户的分组（按用户隔离）。"""
+    gs = _load_groups().get("groups", [])
+    if username is None:
+        return gs
+    return [g for g in gs if g.get("scope") == username]
 
 
-def save_group(name: str, conditions: list, stocks: list) -> dict:
-    """新建或覆盖同名分组。stocks 为结果行 dict 列表。"""
+def save_group(name: str, conditions: list, stocks: list,
+               username: str | None = None) -> dict:
+    """新建或覆盖同用户的同名分组。stocks 为结果行 dict 列表。"""
     obj = _load_groups()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    g = {"name": name, "conditions": conditions, "stocks": stocks,
+    g = {"name": name, "scope": username, "conditions": conditions, "stocks": stocks,
          "created_at": now, "updated_at": now}
-    obj["groups"] = [g if x["name"] == name else x for x in obj["groups"]]
-    if not any(x["name"] == name for x in obj["groups"]):
+    obj["groups"] = [g if (x["name"] == name and x.get("scope") == username) else x
+                     for x in obj["groups"]]
+    if not any(x["name"] == name and x.get("scope") == username for x in obj["groups"]):
         obj["groups"].append(g)
     _save_groups(obj)
     return g
 
 
-def delete_group(name: str) -> None:
+def delete_group(name: str, username: str | None = None) -> None:
     obj = _load_groups()
-    obj["groups"] = [x for x in obj["groups"] if x["name"] != name]
+    obj["groups"] = [x for x in obj["groups"]
+                     if not (x["name"] == name and x.get("scope") == username)]
     _save_groups(obj)
 
 
-def update_group(name: str, progress_cb=None) -> dict | None:
+def update_group(name: str, progress_cb=None, username: str | None = None) -> dict | None:
     """按分组的原条件重新筛选并刷新个股。"""
     obj = _load_groups()
-    g = next((x for x in obj["groups"] if x["name"] == name), None)
+    g = next((x for x in obj["groups"]
+              if x["name"] == name and x.get("scope") == username), None)
     if not g:
         return None
     res = run_filter(g["conditions"], progress_cb=progress_cb)

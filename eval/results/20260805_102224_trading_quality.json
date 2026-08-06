@@ -1,0 +1,62 @@
+{
+  "pass": 3,
+  "fail": 0,
+  "total": 3,
+  "timing": {
+    "total": 1,
+    "evaluated": 1,
+    "d1": {
+      "hits": 0,
+      "total": 0,
+      "rate": 0.0
+    },
+    "d3": {
+      "hits": 0,
+      "total": 0,
+      "rate": 0.0
+    },
+    "d5": {
+      "hits": 0,
+      "total": 0,
+      "rate": 0.0
+    }
+  },
+  "emotion": {
+    "total": 1,
+    "evaluated": 1,
+    "d1": {
+      "returns": [],
+      "avg": 0.0
+    },
+    "d3": {
+      "returns": [],
+      "avg": 0.0
+    },
+    "d5": {
+      "returns": [],
+      "avg": 0.0
+    }
+  },
+  "shortterm": {
+    "total": 1,
+    "evaluated": 1,
+    "d1": {
+      "returns": [
+        6.66
+      ],
+      "avg": 6.66,
+      "failure_rate": 0.0
+    },
+    "d3": {
+      "returns": [],
+      "avg": 0.0,
+      "failure_rate": 0.0
+    },
+    "d5": {
+      "returns": [],
+      "avg": 0.0,
+      "failure_rate": 0.0
+    }
+  },
+  "note": "共 3 条预测，timing 1 / emotion 1 / shortterm 1。已评估 3 条。"
+}

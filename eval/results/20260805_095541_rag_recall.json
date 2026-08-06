@@ -1,0 +1,39 @@
+{
+  "total": 108,
+  "correct": 105,
+  "recall_accuracy": 0.9722,
+  "pass": 105,
+  "fail": 3,
+  "details": [
+    {
+      "query": "打板大面对情绪的影响",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "打板大面",
+        "质量",
+        "打折"
+      ]
+    },
+    {
+      "query": "前日大面低基数怎么判断节点",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "低基数",
+        "绝对值",
+        "混沌"
+      ]
+    },
+    {
+      "query": "情绪节点判断的时间点",
+      "status": "fail",
+      "recall": 0.25,
+      "missed": [
+        "14:57",
+        "尾盘",
+        "每日"
+      ]
+    }
+  ]
+}

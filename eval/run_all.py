@@ -19,11 +19,13 @@ from eval.common import RESULTS_DIR
 
 MODULES_NO_LLM = [
     ("数据准确性", "eval.test_data_accuracy"),
+    ("输出可靠性", "eval.test_output_reliability"),
     ("情绪节点", "eval.test_emotion"),
     ("指数择时", "eval.test_timing"),
     ("筛选NLP解析", "eval.test_filter_nlp"),
     ("RAG检索质量", "eval.test_rag_recall"),
     ("性能基准", "eval.test_benchmark"),
+    ("真实交易质量", "eval.test_trading_quality"),
 ]
 
 MODULES_LLM = [
@@ -108,14 +110,37 @@ def main():
             key_map = {
                 "筛选NLP解析": "filter_nlp",
                 "RAG检索质量": "rag_recall",
+                "输出可靠性": "output_reliability",
+                "真实交易质量": "trading_quality",
+            }
+            metric_map = {
+                "筛选NLP解析": "accuracy",
+                "RAG检索质量": "accuracy",
+                "输出可靠性": "schema_validity_rate",
+                "真实交易质量": "timing",
             }
             for label, key in key_map.items():
-                if name == label:
-                    prev = _load_latest_result(key)
-                    if prev and "accuracy" in prev and "accuracy" in r:
-                        delta = r["accuracy"] - prev["accuracy"]
+                if name != label:
+                    continue
+                prev = _load_latest_result(key)
+                metric = metric_map.get(label, "accuracy")
+                if not prev:
+                    continue
+                if metric == "timing" and "timing" in r and "timing" in prev:
+                    cur_d1 = r["timing"].get("d1", {}).get("rate")
+                    prev_d1 = prev["timing"].get("d1", {}).get("rate")
+                    if cur_d1 is not None and prev_d1 is not None:
+                        delta = cur_d1 - prev_d1
                         flag = "↑" if delta > 0 else ("↓" if delta < 0 else "→")
-                        print(f"  回归: {flag} 上次 {prev['accuracy']:.1%} → 本次 {r['accuracy']:.1%}")
+                        print(f"  回归: {flag} 上次 {prev_d1:.1f}% → 本次 {cur_d1:.1f}%")
+                elif metric in prev and metric in r:
+                    cur_val = r[metric]
+                    prev_val = prev[metric]
+                    fmt = f"{cur_val:.1%}" if isinstance(cur_val, float) and cur_val <= 1 else str(cur_val)
+                    prev_fmt = f"{prev_val:.1%}" if isinstance(prev_val, float) and prev_val <= 1 else str(prev_val)
+                    delta = cur_val - prev_val
+                    flag = "↑" if delta > 0 else ("↓" if delta < 0 else "→")
+                    print(f"  回归: {flag} 上次 {prev_fmt} → 本次 {fmt}")
 
     print("\n" + "=" * 60)
     print(f"  总计: pass={total_pass} fail={total_fail}")

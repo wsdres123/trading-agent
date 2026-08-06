@@ -127,7 +127,12 @@ def get_stock_history(code: str, days: int = 30) -> str:
         parts.append(f"30日涨幅 {_fmt_pct(m['ret_30d'])}")
     parts.append(f"近100日最高 {m['high_100d']:.2f} {'(今日收盘为百日新高)' if m['is_100d_new_high'] else ''}")
     if days not in (5, 30) and days > 0:
-        ret = data._calc_nday_return(code, days)
+        # 原 data._calc_nday_return 已不存在，直接由历史收盘序列计算 N 日涨幅
+        ret = None
+        hist = data.get_stock_hist(code, days=days)
+        if not hist.empty and len(hist) > days:
+            closes = hist["收盘"].astype(float)
+            ret = round((closes.iloc[-1] / closes.iloc[-1 - days] - 1) * 100, 2)
         if ret is not None:
             parts.append(f"{days}日涨幅 {_fmt_pct(ret)}")
     return "；".join(parts)

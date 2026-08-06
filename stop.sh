@@ -33,3 +33,15 @@ if [ -f "$FAPI_PIDFILE" ]; then
 else
   echo "未找到 FastAPI PID 文件。"
 fi
+
+# ── Stop Redis（可选：bash stop.sh --redis，缓存丢失）────────────────────
+if [ "$1" = "--redis" ]; then
+  PW=$(/home/lixiang/anaconda3/bin/python3 -m config.settings --redis-password 2>/dev/null)
+  if redis-cli ping >/dev/null 2>&1; then
+    redis-cli shutdown nosave 2>/dev/null && echo "已停止 Redis"
+  elif [ -n "$PW" ] && redis-cli -a "$PW" ping >/dev/null 2>&1; then
+    redis-cli -a "$PW" shutdown nosave 2>/dev/null && echo "已停止 Redis"
+  else
+    echo "Redis 未在运行。"
+  fi
+fi

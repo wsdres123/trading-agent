@@ -1,0 +1,41 @@
+{
+  "total": 3,
+  "scores": [
+    {
+      "question": "今天大盘怎么样？",
+      "scores": {
+        "factual": 3,
+        "actionable": 4,
+        "concise": 2,
+        "risk_aware": 2
+      },
+      "avg": 2.75,
+      "status": "pass"
+    },
+    {
+      "question": "半导体板块还能追吗？",
+      "scores": {
+        "factual": 1,
+        "actionable": 1,
+        "concise": 5,
+        "risk_aware": 1
+      },
+      "avg": 2.0,
+      "status": "fail"
+    },
+    {
+      "question": "我现在满仓怎么办？",
+      "scores": {
+        "factual": 4,
+        "actionable": 5,
+        "concise": 3,
+        "risk_aware": 5
+      },
+      "avg": 4.25,
+      "status": "pass"
+    }
+  ],
+  "pass": 2,
+  "fail": 1,
+  "overall_avg": 3.0
+}

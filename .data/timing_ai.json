@@ -613,5 +613,67 @@
   "position": "空仓",
   "reason": "量能不足，箱体震荡",
   "source": "backtest"
+ },
+ "2026-08-04": {
+  "mid_cycle": "B",
+  "signal": "转",
+  "position": "轻仓试多，等待量能确认",
+  "reason": "平均股价上穿多空线，但量能2.23万亿＜2.5万亿",
+  "confidence": 0.65,
+  "abstain": false,
+  "evidence": [
+   {
+    "feature": "平均股价与多空线",
+    "value": "上穿",
+    "direction": "bullish"
+   },
+   {
+    "feature": "量能",
+    "value": "2.23万亿",
+    "direction": "bearish"
+   }
+  ],
+  "invalidation": [
+   "量能连续两日＜2.2万亿",
+   "上证收盘跌破3800"
+  ],
+  "position_cap": 1.0,
+  "time": "15:12",
+  "turnover_wanyi": 2.23
+ },
+ "2026-08-05": {
+  "mid_cycle": "B",
+  "signal": "转",
+  "position": "轻仓观望（B周期转折初期）",
+  "reason": "近期仅1个转信号（08-04），需≥2转才可判多→改为转；B周期（复盘表连续标注）；平均股价上穿多空线后第1天",
+  "confidence": 0.8,
+  "abstain": false,
+  "evidence": [
+   {
+    "feature": "量能",
+    "value": "2.68万亿",
+    "direction": "bullish"
+   },
+   {
+    "feature": "平均股价与多空线关系",
+    "value": "27.01>25.71",
+    "direction": "bullish"
+   },
+   {
+    "feature": "情绪节点",
+    "value": "主升--确认",
+    "direction": "bullish"
+   }
+  ],
+  "invalidation": [
+   "上证单日爆量大阴跌超2%",
+   "量能连续两日<2.2万亿"
+  ],
+  "position_cap": 0.3,
+  "time": "16:31",
+  "turnover_wanyi": 2.68,
+  "reviewed": false,
+  "agreed": null,
+  "_patched": "硬规则补丁"
  }
 }
