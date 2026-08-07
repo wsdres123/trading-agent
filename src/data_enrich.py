@@ -13,6 +13,9 @@ from src.data_quotes import _sina_symbol
 
 logger = logging.getLogger("data")
 
+_enrich_row_cache: dict[str, tuple[float, dict]] = {}
+_ENRICH_ROW_TTL = 30
+
 CONCEPT_CACHE = cfg.DATA_DIR / "concepts.json"
 _EM_HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://quote.eastmoney.com/"}
 
@@ -150,6 +153,9 @@ def enrich_stocks(codes: list[str], max_workers: int = 16) -> pd.DataFrame:
     now = time.time()
 
     def one(code: str) -> dict:
+        cached = _enrich_row_cache.get(code)
+        if cached and now - cached[0] < _ENRICH_ROW_TTL:
+            return cached[1].copy()
         row = {"代码": code}
         row.update(_tencent_minute(s, code))
         row["涨停封单额"] = _tencent_seal(s, code)
@@ -168,6 +174,7 @@ def enrich_stocks(codes: list[str], max_workers: int = 16) -> pd.DataFrame:
             row["概念板块"] = c if c is not None else "-"
             if c is not None:
                 concepts[code] = c
+        _enrich_row_cache[code] = (time.time(), row.copy())
         return row
 
     rows = []

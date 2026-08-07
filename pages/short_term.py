@@ -108,6 +108,10 @@ def render():
                 if is_sig and sai.get("signal_reason"):
                     st.markdown(f'<span class="chip">📝 {e(sai["signal_reason"])}</span>',
                                 unsafe_allow_html=True)
+                    gate = sai.get("gate_reason", "")
+                    if gate:
+                        st.markdown(f'<span class="chip" style="font-size:11px;">🔍 {e(gate)}</span>',
+                                    unsafe_allow_html=True)
                 if is_cont and sai.get("continuation_reason"):
                     st.markdown(
                         f'<span class="chip" style="border-color:{e(cfg.COLOR_STOCK)};">'
@@ -173,6 +177,10 @@ def render():
                     f"跳空高开={'是' if lb.get('gap_up') else '否'} · "
                     f"拉红={'是' if lb.get('turn_red') else '否'} · "
                     f"信号触发={'是' if lb.get('triggered') else '否'}")
+                prem = sev.get("lianban_premium_883958", {})
+                st.markdown(
+                    f"**883958当日溢价**: 涨跌幅={prem.get('change_pct', 0)}% · "
+                    f"溢价>3%={'是' if prem.get('triggered') else '否'}")
                 st.markdown(
                     f"**883418微盘股**: 涨跌幅={wp.get('change_pct', 0)}% · "
                     f"安全={'是' if wp.get('safe') else '否'}")

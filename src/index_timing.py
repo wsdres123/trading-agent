@@ -95,15 +95,21 @@ def all_signals() -> dict:
                     avg = pd.concat([avg, today_row], ignore_index=True)
             # 检测上穿
             ma10 = avg["收盘"].rolling(10, min_periods=10).mean()
+            vol_ma5 = avg["成交量"].rolling(5, min_periods=5).mean() if "成交量" in avg.columns else None
             for i in range(1, len(avg)):
                 if not (pd.notna(ma10.iloc[i]) and pd.notna(ma10.iloc[i - 1])):
                     continue
                 if (avg["收盘"].iloc[i - 1] <= ma10.iloc[i - 1]
                         and avg["收盘"].iloc[i] > ma10.iloc[i]):
                     d = str(avg["日期"].iloc[i])
-                    # 上穿多空线可覆盖AI预判，但不覆盖复盘记录
+                    # 1.md标准：上穿多空线需成交额（量能）突破5日均线才确认转
+                    vol_confirmed = (vol_ma5 is not None and pd.notna(vol_ma5.iloc[i])
+                                     and float(avg["成交量"].iloc[i]) > float(vol_ma5.iloc[i]))
+                    if not vol_confirmed:
+                        continue  # 无量上穿，不自动标记转
+                    # 上穿多空线+放量可覆盖AI预判，但不覆盖复盘记录
                     if d not in out or out[d].get("source") == "AI":
-                        out[d] = {"signal": "转", "source": "上穿多空线"}
+                        out[d] = {"signal": "转", "source": "上穿多空线+放量"}
     except Exception:
         pass
     return out
@@ -246,8 +252,22 @@ def _avg_price_status() -> str:
             trend_note = "，近5日持续在多空线上方（上涨趋势中）"
         elif valid and all(c <= m for c, m in valid):
             trend_note = "，近5日持续在多空线下方（下跌趋势中）"
+    # 成交量与5日均线关系（1.md 多空转标准：上穿需成交额突破5日均线）
+    vol_note = ""
+    if "成交量" in avg.columns and len(avg) >= 6:
+        vol = avg["成交量"]
+        vol_ma5 = vol.rolling(5, min_periods=5).mean()
+        if pd.notna(vol_ma5.iloc[-1]):
+            vol_now = float(vol.iloc[-1])
+            vol_ma = float(vol_ma5.iloc[-1])
+            vol_pos = "上方" if vol_now > vol_ma else "下方"
+            vol_cross = ""
+            if pd.notna(vol_ma5.iloc[-2]):
+                if float(vol.iloc[-2]) <= float(vol_ma5.iloc[-2]) and vol_now > vol_ma:
+                    vol_cross = "，今日突破量能M5"
+            vol_note = f"，量能{vol_now/1e6:.0f}万手，量能M5{vol_ma/1e6:.0f}万手，量能在M5{vol_pos}{vol_cross}"
     return (f"{date} 平均股价{close:.2f}，多空线(MA10){ma_val:.2f}，"
-            f"股价在多空线{pos}{cross}{candle_type}{trend_note}")
+            f"股价在多空线{pos}{cross}{candle_type}{trend_note}{vol_note}")
 
 
 JUDGE_PROMPT = """A股指数择时。只输出JSON，不要多余文字：
@@ -265,12 +285,12 @@ JUDGE_PROMPT = """A股指数择时。只输出JSON，不要多余文字：
 1. 量能≥2.5万亿连阳→趋势A/C；缩量阴跌→D；箱体→B；空+D必须空仓；空+B小仓。
 2. signal延续复盘近期标注，除非量价明显反转。
 3. 多空转核心规则（来自1.md规范）：
-   - 平均股价一段下跌后上穿多空线 → 出"转"字（上穿是最强转折信号）
+   - 平均股价一段下跌后上穿多空线，且成交额（量能）突破5日均线 → 出"转"字（上穿+放量是最强转折信号，无量不确认）
    - 平均股价一轮上涨后跌破多空线 → 出"转"字（下穿也是转折信号，转为观望/空）
    - 上涨趋势中出现十字星或阴线 → 出"转"字（警示可能顶部，转为观望）
    - 一般至少2转1多，或3转1多，才能确定一轮主升（多个转信号后才升级为多）
 4. 平均股价在多空线下方且未上穿时，若无转折迹象，signal应为空。
-5. 平均股价上穿多空线出转后，若后续持续在多空线上方且无十字星/阴线，signal可升级为多。
+5. 出现第一个转后，连续俩天平均股价上涨且量能维持在M5均线上，则出现多。仅持续在多空线上方但量能未维持在M5上方时，不可升级为多。
 6. 情绪节点为「主升--确认/主升--加速/主升--延续/主升--高潮」时，支持signal为转/多，不单独因量能不足而下修为空。
 7. 量能不足只影响仓位上限和中级周期判定，不能单独把「转」压成「空」。
 不确定时设abstain=true或confidence<0.5，signal仍必须为多/空/转之一，不要输出观望。
@@ -319,9 +339,9 @@ REVIEW_PROMPT_TIMING = """你是A股择时复核员，请根据以下**同一份
 
 判断规则：
 1. 多空转核心规则：
-   - 平均股价下跌后上穿多空线 → 转；平均股价上涨后下穿多空线 → 转；上涨中出现十字星/阴线 → 转。
+   - 平均股价下跌后上穿多空线，且成交额突破5日均线 → 转；上穿无量不确认转折。平均股价上涨后下穿多空线 → 转；上涨中出现十字星/阴线 → 转。
    - 至少2转1多或3转1多，才能确认一轮主升并判多。
-2. 平均股价上穿多空线出转后，后续持续在线上且无十字星/阴线 → 可升级为多。
+2. 出现第一个转后，连续俩天平均股价上涨且量能维持在M5均线上，则出现多。量能未维持在M5上方时不可判多。
 3. 情绪节点为「主升--确认/主升--加速/主升--延续/主升--高潮」 → 支持signal为转/多，量能不足不单独压空。
 4. 量能不足只影响仓位上限和中级周期，不单独把「转」压成「空」。
 
@@ -400,11 +420,16 @@ def ai_judge(force: bool = False) -> dict:
                       if store[d].get("signal") in ("多", "空", "转")]
 
     def _apply_hard_crossover(res: dict) -> dict:
-        """硬规则：上穿/下穿多空线当日必须出转；2转1多门槛：多个转后才能判多。"""
+        """硬规则：上穿多空线+量能突破M5出转；下穿出转；上涨中阴线/十字星出转；
+        2转1多门槛+量能维持M5才可判多。"""
         sig = res.get("signal", "转")
         forced_reason = ""
-        if "今日上穿多空线" in avg_status and sig != "转":
-            forced_reason = "上穿多空线当日硬规则→转"
+        if "今日上穿多空线" in avg_status:
+            # 上穿+量能突破M5 → 转；上穿但无量 → 不强制转（让LLM判断）
+            if "量能在M5上方" in avg_status or "今日突破量能M5" in avg_status:
+                if sig != "转":
+                    forced_reason = "上穿多空线+量能突破M5→转"
+            # 上穿但量能在M5下方 → 不确认转折，不强制转
         elif "今日下穿多空线" in avg_status and sig not in ("转", "空"):
             forced_reason = "下穿多空线当日硬规则→转"
         elif ("上涨趋势中" in avg_status
@@ -412,10 +437,14 @@ def ai_judge(force: bool = False) -> dict:
               and sig == "多"):
             forced_reason = "上涨中出现阴线/十字星→转"
         elif sig == "多":
-            # 2转1多门槛：近6日里需要至少2个转（或1个转+1个多）才可升为多
+            # 2转1多门槛：近6日里需要至少2个转才可升为多
             zhuans = sum(1 for s in recent_signals if s == "转")
+            # 量能门槛：量能需维持在M5上方才可判多
+            vol_ok = "量能在M5上方" in avg_status
             if zhuans < 2:
                 forced_reason = f"近期仅{zhuans}个转信号，需≥2转才可判多→改为转"
+            elif not vol_ok:
+                forced_reason = "量能未维持在M5上方，不可判多→改为转"
         if forced_reason:
             res = dict(res)
             res["signal"] = "转"

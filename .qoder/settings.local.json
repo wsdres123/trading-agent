@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export LD_LIBRARY_PATH=\"/home/lixiang/anaconda3/lib:${LD_LIBRARY_PATH:-}\" && /home/lixiang/anaconda3/bin/python3 -c \"\nimport time, logging\nlogging.disable\\(logging.WARNING\\)\n\n# 预热连接\nfrom src.llm_gateway import call_llm\ncall_llm\\(prompt='OK', model='qwen-turbo', temperature=0.1, max_tokens=5, timeout=5.0, retries=0\\)\n\nfrom src import single_stock as ss\nzg_text = '高争民爆\\(002823\\)、风范股份\\(601700\\)、爱丽家居\\(603221\\)、锦和商管\\(603068\\)、传智教育\\(003032\\)、一鸣食品\\(605179\\)'\nprompt = ss.AI_PROMPT.format\\(\n    cycle='B', n_zg=6, n_core=0, n_follow=0, n_st=0,\n    signal='未现', zhuanggu=zg_text, mainline='无主线', shortterm='无信号'\\)\nprint\\(f'prompt长度: {len\\(prompt\\)} chars'\\)\n\nt0 = time.time\\(\\)\nr = call_llm\\(prompt=prompt, model='qwen-turbo', temperature=0.1, max_tokens=800, timeout=6.0, retries=0\\)\nt1 = time.time\\(\\)\nprint\\(f'6只庄股: {t1-t0:.2f}s, 响应{len\\(r\\) if r else 0} chars'\\)\nif r:\n    print\\(f'前150字: {r[:150]}'\\)\n\" 2>&1 | grep -v \"pkg_resources\\\\|UserWarning\\\\|import pkg\")"
+    ]
+  }
+}

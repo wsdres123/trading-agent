@@ -65,6 +65,18 @@ def reset_token_stats() -> None:
     _token_stats.update({"total_input": 0, "total_output": 0, "calls": 0})
 
 
+_client = None
+
+
+def _get_client():
+    """模块级 OpenAI 客户端单例，复用 httpx 连接池减少 TCP/TLS 握手开销。"""
+    global _client
+    if _client is None:
+        from openai import OpenAI
+        _client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL)
+    return _client
+
+
 def call_llm(
     prompt: str,
     model: str | None = None,
@@ -103,8 +115,8 @@ def call_llm(
     if not models:
         models.append(cfg.QWEN_CHAT_MODEL)
 
-    from openai import OpenAI
-    client = OpenAI(api_key=cfg.QWEN_API_KEY, base_url=cfg.QWEN_BASE_URL, timeout=timeout)
+    from openai import OpenAI  # noqa: F401 (用于类型检查)
+    client = _get_client()
 
     messages: list[dict] = []
     if system:
@@ -125,6 +137,7 @@ def call_llm(
                     "messages": messages,
                     "temperature": temperature,
                     "max_tokens": max_tokens,
+                    "timeout": timeout,
                 }
                 if extra_body:
                     kwargs["extra_body"] = extra_body

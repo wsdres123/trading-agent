@@ -675,5 +675,40 @@
   "reviewed": false,
   "agreed": null,
   "_patched": "硬规则补丁"
+ },
+ "2026-08-06": {
+  "mid_cycle": "B",
+  "signal": "转",
+  "position": "轻仓试多（B周期转折期）",
+  "reason": "平均股价在多空线上方，2转后仍需量能持续确认；量能2.54万亿接近标准；B周期维持",
+  "confidence": 0.7,
+  "abstain": false,
+  "evidence": [
+   {
+    "feature": "量能",
+    "value": "2.54万亿",
+    "direction": "bullish"
+   },
+   {
+    "feature": "平均股价与多空线关系",
+    "value": "27.28 > 25.83",
+    "direction": "bullish"
+   },
+   {
+    "feature": "情绪节点",
+    "value": "主升--确认",
+    "direction": "bullish"
+   }
+  ],
+  "invalidation": [
+   "平均股价跌破多空线",
+   "量能连续2日低于M5均线",
+   "成交额跌破2.5万亿"
+  ],
+  "position_cap": 0.3,
+  "time": "16:22",
+  "turnover_wanyi": 2.54,
+  "reviewed": false,
+  "agreed": null
  }
 }

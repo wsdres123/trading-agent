@@ -136,7 +136,7 @@ def _is_main_board(code: str) -> bool:
 
 
 def screen_zhuanggu(date_str: str | None = None) -> pd.DataFrame:
-    """庄股筛选：连续5日收盘>MA5, 自由流通市值>30亿, 5日涨幅>15%, 主板, 30日涨幅>40%。
+    """庄股筛选：连续5日收盘>MA5, 自由流通市值>30亿, 5日涨幅>20%, 主板, 30日涨幅>50%。
 
     date_str: 指定日期(YYYY-MM-DD)，None=今日。历史日期用缓存矩阵算。
     """
@@ -145,9 +145,9 @@ def screen_zhuanggu(date_str: str | None = None) -> pd.DataFrame:
         conditions = [
             {"field": "close_gt_ma", "ma": 5, "days": 5},
             {"field": "free_float_cap", "min_yi": 30},
-            {"field": "return_ndays", "days": 5, "min_pct": 15},
+            {"field": "return_ndays", "days": 5, "min_pct": 20},
             {"field": "board", "name": "主板"},
-            {"field": "return_ndays", "days": 30, "min_pct": 40},
+            {"field": "return_ndays", "days": 30, "min_pct": 50},
         ]
         res = sf.run_filter(conditions)
         return sf.finalize_results(res)
@@ -192,7 +192,7 @@ def _zhuanggu_from_cache(date_str: str) -> pd.DataFrame:
     mkt = (pd.to_numeric(cache["流通市值_亿"], errors="coerce").to_numpy()
            if cache is not None and "流通市值_亿" in cache.columns
            else np.full(len(codes), np.nan))
-    mask = (ret_5d > 15) & (ret_30d > 40) & ok_ma5 & is_main & (mkt > 30)
+    mask = (ret_5d > 20) & (ret_30d > 50) & ok_ma5 & is_main & (mkt > 30)
     mask = np.where(np.isnan(ret_5d) | np.isnan(ret_30d), False, mask)
     rows = []
     for r in np.flatnonzero(mask):
@@ -358,11 +358,8 @@ def _enrich_from_cache(codes: list[str], date_str: str) -> pd.DataFrame:
 
 
 # ── AI 个股判断（精简prompt + qwen-turbo，目标3s内）───────────────────────
-AI_PROMPT = """A股个股判断。周期{cycle}。对以下候选给出买卖判断，只输出JSON：
-{{"zhuanggu":[{{"code":"代码","name":"名称","verdict":"可做/观察/回避","buy":"买点","sell":"卖点","risk":"风险","reason":"理由20字"}}],"mainline":[{{"code":"","name":"","type":"核心/补涨","verdict":"","buy":"","sell":"","reason":""}}],"shortterm":[{{"code":"","name":"","mode":"","verdict":"","buy":"","sell":"","reason":""}}],"summary":"总结100字"}}
-
-策略规范（单一事实来源）：
-{spec}
+AI_PROMPT = """A股个股判断。周期{cycle}。对以下候选给出买卖判断，紧凑JSON每对象一行，只输出JSON：
+{{"zhuanggu":[{{"code":"代码","name":"名称","verdict":"可做/观察/回避","buy":"买点","sell":"卖点","risk":"风险","reason":"10字"}}],"mainline":[{{"code":"","name":"","type":"核心/补涨","verdict":"","buy":"","sell":"","reason":"10字"}}],"shortterm":[{{"code":"","name":"","mode":"","verdict":"","buy":"","sell":"","reason":"10字"}}],"summary":"50字"}}
 
 规则：A/B/C弹个股D不弹。主线核心是阵眼补涨跟随，买卖点后续补充先给趋势判断。短线起变信号后才介入。庄股趋势不破盘中低吸，收盘破5日均线卖，优先独立趋势票。无候选返回空数组。
 庄股({n_zg}只):{zhuanggu}
@@ -375,7 +372,7 @@ def _stocks_to_text(df: pd.DataFrame, max_n: int = 20) -> str:
     if df is None or df.empty:
         return "无"
     return "、".join(
-        f"{r.get('名称','')}({r.get('代码','')}){r.get('涨跌幅','')}%"
+        f"{r.get('名称','')}({r.get('代码','')})"
         for _, r in df.head(max_n).iterrows())
 
 
@@ -419,7 +416,6 @@ def ai_judge(cycle: str, zhuanggu_df: pd.DataFrame,
         return _fallback()
 
     from src.llm_gateway import call_llm
-    spec_text = load_spec_text(SPEC)
     prompt = AI_PROMPT.format(
         cycle=cycle or "未知",
         n_zg=len(zhuanggu_df) if zhuanggu_df is not None else 0,
@@ -427,28 +423,184 @@ def ai_judge(cycle: str, zhuanggu_df: pd.DataFrame,
         n_follow=len(ml_data.get("follow_raw", [])),
         n_st=len(st_data.get("all_codes", [])),
         signal=signal,
-        zhuanggu=zg_text, mainline=ml_text, shortterm=st_text,
-        spec=spec_text)
+        zhuanggu=zg_text, mainline=ml_text, shortterm=st_text)
 
-    for _model in ("qwen-turbo", "qwen-plus", cfg.QWEN_CHAT_MODEL):
+    for _attempt in range(2):
         try:
             raw = call_llm(
                 prompt=prompt,
-                model=_model,
+                model="qwen-turbo",
                 temperature=0.1,
-                max_tokens=500,
-                timeout=30.0,
+                max_tokens=800,
+                timeout=5.0,
                 retries=0,
             )
             if raw is None:
                 continue
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            if isinstance(parsed, list) and parsed:
+                parsed = parsed[0]
+            if isinstance(parsed, dict) and parsed:
+                return parsed
+            logger.warning("AI qwen-turbo 返回空对象，重试(%d/2)", _attempt + 1)
+            continue
         except Exception as e:
-            logger.warning("AI (%s) 个股判读失败: %s", _model, e)
+            logger.warning("AI qwen-turbo 个股判读失败: %s", e)
             continue
     return _fallback()
+
+
+# ── 无主线时趋势核心 ───────────────────────────────────────────────────
+def check_trend_core_external() -> dict:
+    """检查无主线时趋势核心的外部标准（OR逻辑，满足任一即触发）。
+
+    1. 平均股价信号转/多
+    2. 平均股价涨幅>2%
+    3. 成交前10个股指数(883902)涨幅>2%
+    4. 同花顺热股指数涨幅>2%
+    5. 情绪节点强修复或主升期
+    """
+    conditions = []
+
+    # 1. 平均股价信号
+    avg_signal = ""
+    try:
+        ti_path = cfg.DATA_DIR / "timing_ai.json"
+        if ti_path.exists():
+            ti = json.loads(ti_path.read_text(encoding="utf-8"))
+            if ti:
+                last_key = sorted(ti.keys())[-1]
+                avg_signal = str(ti[last_key].get("signal", ""))
+    except Exception:
+        pass
+    cond1_ok = avg_signal in ("转", "多")
+    conditions.append({"name": "平均股价信号转/多", "value": avg_signal or "无", "ok": cond1_ok})
+
+    # 2. 平均股价涨幅
+    avg_pct = 0.0
+    try:
+        from src import index_timing
+        avg_kl = index_timing.avg_price_kline(days=5)
+        if avg_kl is not None and len(avg_kl) >= 2:
+            avg_kl = avg_kl.sort_values("日期").reset_index(drop=True)
+            today_close = float(avg_kl["收盘"].iloc[-1])
+            prev_close = float(avg_kl["收盘"].iloc[-2])
+            avg_pct = round((today_close / prev_close - 1) * 100, 2) if prev_close else 0.0
+    except Exception:
+        pass
+    cond2_ok = avg_pct > 2
+    conditions.append({"name": "平均股价涨幅>2%", "value": f"{avg_pct}%", "ok": cond2_ok})
+
+    # 3. 成交前10个股指数(883902)
+    idx_pct = 0.0
+    try:
+        df = data.get_ths_index_daily("883902", days=5)
+        if df is not None and len(df) >= 2:
+            df = df.sort_values("日期").reset_index(drop=True)
+            today_close = float(df["收盘"].iloc[-1])
+            prev_close = float(df["收盘"].iloc[-2])
+            idx_pct = round((today_close / prev_close - 1) * 100, 2) if prev_close else 0.0
+    except Exception:
+        pass
+    cond3_ok = idx_pct > 2
+    conditions.append({"name": "成交前10指数涨幅>2%", "value": f"{idx_pct}%", "ok": cond3_ok})
+
+    # 4. 同花顺热股指数
+    hot_pct = 0.0
+    try:
+        from src import emotion_node as en
+        hs = en.hot_stock_stats()
+        hot_pct = float(hs.get("热门个股指数", 0))
+    except Exception:
+        pass
+    cond4_ok = hot_pct > 2
+    conditions.append({"name": "热股指数涨幅>2%", "value": f"{hot_pct}%", "ok": cond4_ok})
+
+    # 5. 情绪节点强修复/主升
+    emotion_node = ""
+    try:
+        en_path = cfg.DATA_DIR / "emotion_ai.json"
+        if en_path.exists():
+            en = json.loads(en_path.read_text(encoding="utf-8"))
+            if en:
+                last_key = sorted(en.keys())[-1]
+                emotion_node = str(en[last_key].get("node", ""))
+    except Exception:
+        pass
+    cond5_ok = "修复" in emotion_node or "主升" in emotion_node
+    conditions.append({"name": "情绪节点修复/主升", "value": emotion_node or "无", "ok": cond5_ok})
+
+    triggered = any(c["ok"] for c in conditions)
+    reason = "；".join(f"{c['name']}={c['value']}({'✓' if c['ok'] else '✗'})" for c in conditions)
+    return {"triggered": triggered, "conditions": conditions, "reason": reason}
+
+
+def screen_trend_core(date_str: str | None = None) -> pd.DataFrame:
+    """无主线趋势核心个股筛选：自由流通市值>200亿, 5日涨幅>20%, 10日涨幅>10%, 成交额>30亿, 收盘价在3日线上。"""
+    from datetime import date as _date
+    if not date_str or date_str == _date.today().strftime("%Y-%m-%d"):
+        conditions = [
+            {"field": "free_float_cap", "min_yi": 200},
+            {"field": "return_ndays", "days": 5, "min_pct": 20},
+            {"field": "return_ndays", "days": 10, "min_pct": 10},
+            {"field": "amount", "min_yi": 30},
+            {"field": "close_gt_ma", "ma": 3, "days": 1},
+        ]
+        res = sf.run_filter(conditions)
+        return sf.finalize_results(res)
+    return _trend_core_from_cache(date_str)
+
+
+def _trend_core_from_cache(date_str: str) -> pd.DataFrame:
+    """历史日期趋势核心筛选：从缓存矩阵算。"""
+    from src import theme_mode as tm
+    m = tm._matrices()
+    if m is None:
+        return pd.DataFrame(columns=DISPLAY_COLS)
+    dates, C, A = m["dates"], m["C"], m["A"]
+    codes, names = m["codes"], m["names"]
+    idx = _find_date_idx(dates, date_str)
+    if idx is None or idx < 10:
+        return pd.DataFrame(columns=DISPLAY_COLS)
+
+    with np.errstate(invalid="ignore"):
+        ret_5d = (C[:, idx] / C[:, idx - 5] - 1) * 100
+        ret_10d = (C[:, idx] / C[:, idx - 10] - 1) * 100
+        amount_yi = A[:, idx] / 1e8
+        ma3 = np.nanmean(C[:, idx - 2:idx + 1], axis=1)
+    cache = data.load_metrics_cache()
+    mkt = (pd.to_numeric(cache["流通市值_亿"], errors="coerce").to_numpy()
+           if cache is not None and "流通市值_亿" in cache.columns
+           else np.full(len(codes), np.nan))
+    mask = (mkt > 200) & (ret_5d > 20) & (ret_10d > 10) & (amount_yi > 30) & (C[:, idx] > ma3)
+    mask = np.where(np.isnan(ret_5d) | np.isnan(ret_10d) | np.isnan(mkt) | np.isnan(ma3), False, mask)
+    rows = []
+    for r in np.flatnonzero(mask):
+        rows.append({
+            "代码": codes[r], "名称": names[r],
+            "最新价": round(float(C[r, idx]), 2),
+            "涨跌幅": round((C[r, idx] / C[r, idx - 1] - 1) * 100, 2)
+                     if idx > 0 and not np.isnan(C[r, idx - 1]) else None,
+            "涨速": None,
+            "自由流通市值(亿)": round(float(mkt[r]), 2) if not np.isnan(mkt[r]) else None,
+            "成交额(亿)": round(float(amount_yi[r]), 2) if not np.isnan(amount_yi[r]) else None,
+            "概念板块": "",
+        })
+    df = pd.DataFrame(rows, columns=DISPLAY_COLS)
+    if not df.empty:
+        try:
+            extra = data.enrich_stocks(df["代码"].tolist())
+            if not extra.empty and "概念板块" in extra.columns:
+                df = df.merge(extra[["代码", "概念板块"]], on="代码", how="left",
+                              suffixes=("", "_e"))
+                df["概念板块"] = df["概念板块_e"].fillna(df["概念板块"])
+                df = df.drop(columns=["概念板块_e"])
+        except Exception:
+            pass
+        df = df.sort_values("涨跌幅", ascending=False, na_position="last")
+    return df.reset_index(drop=True)
 
 
 # ── 入口：一键运行三个子板块 + AI判断 ────────────────────────────────────
@@ -477,25 +629,71 @@ def run(date_str: str | None = None) -> dict:
             "ai_result": {"error": "D周期不弹个股", "candidates": []},
         }
 
-    zhuanggu = screen_zhuanggu(date_str)
-
-    # 主线：30天窗口 ending at date_str
-    _end = date_str
+    from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
     from datetime import datetime as _dt
+    import time as _time
+
+    _end = date_str
     _start = (_dt.strptime(date_str, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
-    ml_data = get_mainline_stocks(_start, _end)
 
-    st_data = get_shortterm_stocks(date_str)
-    ai_result = ai_judge(cyc, zhuanggu, ml_data, st_data)
+    _t0 = _time.time()
 
-    # 主线/短线个股增强为展示列（历史日期从缓存取）
-    ml_display = pd.DataFrame()
-    if ml_data.get("has_mainline"):
-        codes = ml_data.get("core_codes", []) + ml_data.get("follow_codes", [])
-        ml_display = enrich_to_display(codes, date_str)
-    st_display = pd.DataFrame()
-    if st_data.get("all_codes"):
-        st_display = enrich_to_display(st_data["all_codes"], date_str)
+    # Phase A: 所有独立筛选任务并行
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        fut_zg = ex.submit(screen_zhuanggu, date_str)
+        fut_ml = ex.submit(get_mainline_stocks, _start, _end)
+        fut_st = ex.submit(get_shortterm_stocks, date_str)
+        fut_ext = ex.submit(check_trend_core_external)
+        zhuanggu = fut_zg.result()
+        ml_data = fut_ml.result()
+        st_data = fut_st.result()
+        ext = fut_ext.result()
+
+    _phase_a = _time.time() - _t0
+    trend_core_triggered = not ml_data.get("has_mainline") and ext.get("triggered")
+
+    # Phase B: AI判断 + 展示增强 + 趋势核心 并行，整体限时2.5秒
+    ml_codes = (ml_data.get("core_codes", []) + ml_data.get("follow_codes", [])
+                if ml_data.get("has_mainline") else [])
+    st_codes = st_data.get("all_codes", [])
+
+    _ai_fallback = {
+        "zhuanggu": [], "mainline": [], "shortterm": [],
+        "summary": f"AI判断超时。周期{cyc}，庄股{len(zhuanggu) if zhuanggu is not None else 0}只，"
+                   f"主线{'有' if ml_data.get('has_mainline') else '无'}，"
+                   f"信号{'已现' if st_data.get('is_signal') else '未现'}。",
+    }
+
+    ex = ThreadPoolExecutor(max_workers=4)
+    fut_ai = ex.submit(ai_judge, cyc, zhuanggu, ml_data, st_data)
+    fut_ml_disp = ex.submit(enrich_to_display, ml_codes, date_str) if ml_codes else None
+    fut_st_disp = ex.submit(enrich_to_display, st_codes, date_str) if st_codes else None
+    fut_tc = ex.submit(screen_trend_core, date_str) if trend_core_triggered else None
+
+    _all_futs = [f for f in [fut_ai, fut_ml_disp, fut_st_disp, fut_tc] if f is not None]
+    _done, _not_done = wait(_all_futs, timeout=5.0, return_when=ALL_COMPLETED)
+
+    ai_result = fut_ai.result() if fut_ai in _done else _ai_fallback
+    ml_display = fut_ml_disp.result() if (fut_ml_disp and fut_ml_disp in _done) else (
+        fut_ml_disp.result() if fut_ml_disp else pd.DataFrame())
+    st_display = fut_st_disp.result() if (fut_st_disp and fut_st_disp in _done) else (
+        fut_st_disp.result() if fut_st_disp else pd.DataFrame())
+    trend_core_df = fut_tc.result() if (fut_tc and fut_tc in _done) else (
+        fut_tc.result() if fut_tc else pd.DataFrame())
+
+    ex.shutdown(wait=False)
+
+    _total = _time.time() - _t0
+    logger.info("个股run完成: PhaseA=%.2fs 总计=%.2fs AI=%s",
+                _phase_a, _total, "超时" if fut_ai not in _done else "完成")
+
+    trend_core_data = {}
+    if trend_core_triggered:
+        trend_core_data = {
+            "triggered": True,
+            "external": ext,
+            "stocks": trend_core_df,
+        }
 
     return {
         "date": date_str,
@@ -505,5 +703,6 @@ def run(date_str: str | None = None) -> dict:
         "mainline_data": ml_data,
         "shortterm_display": st_display,
         "shortterm_data": st_data,
+        "trend_core_data": trend_core_data,
         "ai_result": ai_result,
     }

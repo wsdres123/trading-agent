@@ -25,6 +25,9 @@ from src.schema_validator import load_spec_text
 
 logger = logging.getLogger("short_term")
 
+_DETECT_CACHE: dict = {"key": None, "result": None, "ts": 0.0}
+_DETECT_TTL = 60  # 秒
+
 SHORT_SPEC = cfg.DOCS_DIR / "Short-term.md"
 BIDDING_CSV = cfg.KNOWLEDGE_DIR / "屠龙表 - 竞价表.csv"
 SIGNAL_STORE = cfg.DATA_DIR / "short_term_signal.json"
@@ -61,7 +64,7 @@ MODES_DEF = [
     {
         "mode": "分歧转一致",
         "condition": "情绪分歧2-3天后有修复预期，连板指数弱2-3天，个股爆量分歧转一致带动板块回流，"
-                     "同时板块低位有首板助攻情绪",
+                     "同时板块低位有首板助攻情绪（标准：4板以上，同板块低位涨停支持>2个）",
         "buy_point": "爆量分歧转一致上板即买点",
         "sell_point": "次日不能高开弱转强，或爆量平开则兑现",
         "position": "3层以下",
@@ -77,7 +80,7 @@ MODES_DEF = [
     {
         "mode": "补涨",
         "condition": "高度龙头断板当天或爆量当天，龙头不能大负反馈（跌超-5%），"
-                     "做1进2不同板块或和龙头同板块的首板补涨，博弈空间溢价",
+                     "做1进2不同板块或和龙头同板块的首板补涨，博弈空间溢价（标准：3板及以下）",
         "buy_point": "龙头断板/爆量当天，做1进2或首板补涨",
         "sell_point": "次日强转弱则走",
         "position": "3层",
@@ -385,14 +388,36 @@ def calc_weipan_safe(code: str = "883418",
     result["safe"] = change_pct > -1.0
     return result
 
+def calc_lianban_premium(code: str = "883958", date_str: str | None = None) -> dict:
+    """计算883958当日涨跌幅，用于判断'溢价>3%'的起变条件。"""
+    df = data.get_ths_index_daily(code, days=5)
+    result = {"change_pct": 0.0, "triggered": False}
+    if df is None or df.empty or len(df) < 2:
+        return result
+    df = df.sort_values("日期").reset_index(drop=True)
+    if date_str:
+        df = df[df["日期"].astype(str).str[:10] <= date_str].reset_index(drop=True)
+    if df.empty or len(df) < 2:
+        return result
+    today_close = float(df.iloc[-1]["收盘"])
+    prev_close = float(df.iloc[-2]["收盘"])
+    change_pct = (today_close / prev_close - 1) * 100 if prev_close else 0.0
+    result["change_pct"] = round(change_pct, 2)
+    result["triggered"] = change_pct > 3.0
+    return result
+
+
 def calc_continuation_signal(code: str = "883958",
-                              date_str: str | None = None) -> dict:
+                              date_str: str | None = None,
+                              space: int = 0,
+                              weipan_safe: bool = True) -> dict:
     """延续信号：起变信号出现第2天，连板指数还能维持3个点溢价。
 
     date_str: 分析日期，仅取该日及之前的K线（None则用最新数据）。
     返回 {triggered, premium_pct, yesterday_signal_date}
     """
-    result = {"triggered": False, "premium_pct": 0.0, "yesterday_signal_date": ""}
+    result = {"triggered": False, "premium_pct": 0.0, "yesterday_signal_date": "",
+              "space_ok": False, "weipan_safe": False}
     state = _load_signal_state()
     signal_date = state.get("signal_date", "")
     if not signal_date:
@@ -412,14 +437,16 @@ def calc_continuation_signal(code: str = "883958",
     trading_days_after = sum(
         1 for d in df["日期"] if str(d)[:10] > signal_date
     )
-    if trading_days_after != 1:
+    if trading_days_after < 1:
         return result
     today_close = float(df.iloc[-1]["收盘"])
     prev_close = float(df.iloc[-2]["收盘"])
     premium_pct = (today_close / prev_close - 1) * 100 if prev_close else 0.0
     result["premium_pct"] = round(premium_pct, 2)
     result["yesterday_signal_date"] = signal_date
-    result["triggered"] = premium_pct >= 3.0
+    result["space_ok"] = space > 5
+    result["weipan_safe"] = weipan_safe
+    result["triggered"] = premium_pct >= 3.0 and space > 5 and weipan_safe
     return result
 
 
@@ -447,7 +474,10 @@ def build_evidence(date_str: str) -> dict:
 
     lianban = calc_lianban_signal("883958", date_str=date_str)
     weipan = calc_weipan_safe("883418", date_str=date_str)
-    continuation = calc_continuation_signal("883958", date_str=date_str)
+    lianban_premium = calc_lianban_premium("883958", date_str=date_str)
+    continuation = calc_continuation_signal("883958", date_str=date_str,
+                                             space=space,
+                                             weipan_safe=weipan.get("safe", True))
 
     # 连板天梯摘要（前8只）
     ladder_summary = []
@@ -464,6 +494,28 @@ def build_evidence(date_str: str) -> dict:
                 "自由流通市值(亿)": str(r.get("自由流通市值(亿)", "")),
             })
 
+    # 行业涨停统计（全量，用于模式2同板块支持判断）
+    industry_board_counts = {}
+    if not ladder.empty and "所属行业" in ladder.columns:
+        industry_board_counts = (
+            ladder["所属行业"].value_counts().to_dict()
+        )
+
+    # 低板摘要（1-3板，前10只，用于模式4补涨）
+    ladder_low_summary = []
+    if not ladder.empty and "连板数" in ladder.columns:
+        low = ladder[ladder["连板数"].between(1, 3)]
+        if not low.empty:
+            for _, r in low.head(10).iterrows():
+                ladder_low_summary.append({
+                    "代码": str(r.get("代码", "")),
+                    "名称": str(r.get("名称", "")),
+                    "连板数": int(r.get("连板数", 0)),
+                    "所属行业": str(r.get("所属行业", "")),
+                    "封板资金(亿)": str(r.get("封板资金(亿)", "")),
+                    "炸板次数": str(r.get("炸板次数", "")),
+                })
+
     return {
         "date": date_str,
         "space": space,
@@ -478,10 +530,13 @@ def build_evidence(date_str: str) -> dict:
         } if high_board is not None else None,
         "high_board_is_one_line": high_is_one_line,
         "lianban_883958": lianban,
+        "lianban_premium_883958": lianban_premium,
         "weipan_883418": weipan,
         "continuation_883958": continuation,
         "ladder_count": len(ladder) if not ladder.empty else 0,
         "ladder_summary": ladder_summary,
+        "industry_board_counts": industry_board_counts,
+        "ladder_low_summary": ladder_low_summary,
     }
 
 
@@ -490,33 +545,42 @@ def hard_gate(evidence: dict) -> dict:
     """第一层：硬门控。事实性条件由程序判定，不依赖模型。"""
     lb = evidence.get("lianban_883958", {})
     wp = evidence.get("weipan_883418", {})
+    premium = evidence.get("lianban_premium_883958", {})
     cont = evidence.get("continuation_883958", {})
     space = evidence.get("space", 0)
 
-    high_is_one_line = evidence.get("high_board_is_one_line", False)
+    # 起变信号：满足以下任一条件即触发（OR逻辑）
+    cond_a = lb.get("triggered", False)       # 883958连阴>=3天后跳空高开拉红
+    cond_b = premium.get("triggered", False)  # 883958当日涨幅>3%（溢价）
+    cond_c = space >= 5                        # 连板空间突破到5板
+    cond_d = wp.get("safe", True)              # 883418微盘股涨跌幅>-1%
 
-    # 起变硬门控：连板空间>4 + 连板指数触发 + 微盘安全 + 高度板非一字板（有换手）
-    is_signal = (space > 4
-                 and lb.get("triggered", False)
-                 and wp.get("safe", True)
-                 and not high_is_one_line)
+    is_signal = cond_a or cond_b or cond_c or cond_d
 
     is_continuation = cont.get("triggered", False)
 
     reasons = []
     if is_signal:
-        reasons.append(f"连板空间{space}>4板")
-        reasons.append("883958连阴后跳空高开拉红")
-        reasons.append(f"微盘股{'安全' if wp.get('safe') else '不安全'}")
+        if cond_a:
+            reasons.append(f"883958连阴{lb.get('prev_green_red_days', 0)}天后跳空高开拉红")
+        if cond_b:
+            reasons.append(f"883958溢价{premium.get('change_pct', 0)}%>3%")
+        if cond_c:
+            reasons.append(f"连板空间{space}板>=5板")
+        if cond_d:
+            reasons.append(f"微盘股883418涨跌幅{wp.get('change_pct', 0)}%>-1%")
     if is_continuation:
-        reasons.append(f"883958维持{cont.get('premium_pct', 0)}%溢价")
+        reasons.append(f"883958维持{cont.get('premium_pct', 0)}%溢价 空间{space}板 微盘安全")
 
     return {
         "is_signal": is_signal,
         "is_continuation": is_continuation,
-        "high_is_one_line": high_is_one_line,
         "premium_pct": cont.get("premium_pct", 0.0),
         "reason": "；".join(reasons) if reasons else "未满足起变/延续硬条件",
+        "cond_a": cond_a,
+        "cond_b": cond_b,
+        "cond_c": cond_c,
+        "cond_d": cond_d,
     }
 
 
@@ -539,8 +603,8 @@ def score_modes(evidence: dict) -> list[dict]:
         if breaks > 0:
             breakout_score = 1.0
             breakout_candidates.append({
-                "code": hb.get("代码", ""), "name": hb.get("名称", ""),
-                "boards": space, "reason": f"站上新高度{space}板 炸板{breaks}次（非一字有换手）"
+                "代码": hb.get("代码", ""), "名称": hb.get("名称", ""),
+                "连板数": space, "原因": f"站上新高度{space}板 炸板{breaks}次（非一字有换手）"
             })
     results.append({
         "mode": "突破空间压制", "score": breakout_score,
@@ -549,20 +613,30 @@ def score_modes(evidence: dict) -> list[dict]:
         "sell_point": "30分钟不上水或次日退潮", "position": "5层",
     })
 
-    # 模式2: 分歧转一致
+    # 模式2: 分歧转一致（标准：4板以上，同板块低位涨停支持>2个为加分）
+    industry_counts = evidence.get("industry_board_counts", {})
     divergence_candidates = []
     for s in ladder:
+        if s["连板数"] < 4:
+            continue
         try:
             breaks = int(s.get("炸板次数", 0))
         except (ValueError, TypeError):
             breaks = 0
         if breaks > 0 and not is_one_line_board(s):
+            industry = s.get("所属行业", "")
+            support_count = max(0, int(industry_counts.get(industry, 0)) - 1)
+            reason = f"{s['连板数']}板 炸板{breaks}次（分歧后回封）"
+            if support_count > 2:
+                reason += f" 同板块{support_count}只涨停支持"
             divergence_candidates.append({
-                "code": s["代码"], "name": s["名称"],
-                "boards": s["连板数"],
-                "reason": f"{s['连板数']}板 炸板{breaks}次（分歧后回封）"
+                "代码": s["代码"], "名称": s["名称"],
+                "连板数": s["连板数"],
+                "所属行业": industry,
+                "支持数": support_count,
+                "原因": reason,
             })
-    divergence_candidates.sort(key=lambda x: -x["boards"])
+    divergence_candidates.sort(key=lambda x: (-x["连板数"], -x.get("支持数", 0)))
     div_score = min(1.0, len(divergence_candidates) / 3)
     results.append({
         "mode": "分歧转一致", "score": div_score,
@@ -581,15 +655,15 @@ def score_modes(evidence: dict) -> list[dict]:
                 amount = 0
             if amount >= 10:
                 yizi_candidates.append({
-                    "code": s["代码"], "name": s["名称"],
-                    "boards": s["连板数"],
-                    "amount_yi": amount,
-                    "industry": s.get("所属行业", ""),
-                    "reason": f"一字板 封单{amount:.0f}亿 [{s.get('所属行业', '')}]"
+                    "代码": s["代码"], "名称": s["名称"],
+                    "连板数": s["连板数"],
+                    "封单额(亿)": amount,
+                    "所属行业": s.get("所属行业", ""),
+                    "原因": f"一字板 封单{amount:.0f}亿 [{s.get('所属行业', '')}]"
                 })
-    board_counts = Counter(s["industry"] for s in yizi_candidates)
+    board_counts = Counter(s["所属行业"] for s in yizi_candidates)
     has_cluster = any(c >= 3 for c in board_counts.values())
-    has_big = any(s.get("amount_yi", 0) >= 30 for s in yizi_candidates)
+    has_big = any(s.get("封单额(亿)", 0) >= 30 for s in yizi_candidates)
     newtheme_score = 0.0
     if has_big:
         newtheme_score += 0.5
@@ -602,16 +676,18 @@ def score_modes(evidence: dict) -> list[dict]:
         "sell_point": "次日一字封单减少则走", "position": "3层以下",
     })
 
-    # 模式4: 补涨
+    # 模式4: 补涨（标准：3板及以下）
     buzhang_candidates = []
-    for s in ladder:
-        if s["连板数"] < space and s["连板数"] >= 2:
+    for s in evidence.get("ladder_low_summary", []):
+        boards = s["连板数"]
+        if 1 <= boards <= 3:
             buzhang_candidates.append({
-                "code": s["代码"], "name": s["名称"],
-                "boards": s["连板数"],
-                "reason": f"{s['连板数']}板 低于空间{space}板（补涨候选）"
+                "代码": s["代码"], "名称": s["名称"],
+                "连板数": boards,
+                "所属行业": s.get("所属行业", ""),
+                "原因": f"{boards}板 低于空间{space}板（补涨候选）"
             })
-    buzhang_candidates.sort(key=lambda x: -x["boards"])
+    buzhang_candidates.sort(key=lambda x: -x["连板数"])
     buzhang_score = min(1.0, len(buzhang_candidates) / 3) if space >= 5 else 0
     results.append({
         "mode": "补涨", "score": buzhang_score,
@@ -757,7 +833,7 @@ def _llm_adjudicate(evidence: dict, gate: dict, modes: list[dict]) -> dict | Non
                 model=model,
                 temperature=0.2,
                 max_tokens=400,
-                timeout=30.0,
+                timeout=10.0,
                 retries=0,
             )
             if raw is None:
@@ -843,6 +919,9 @@ def _evidence_to_text(ev: dict) -> str:
                  f"跳空高开={'是' if lb.get('gap_up') else '否'} "
                  f"拉红={'是' if lb.get('turn_red') else '否'} "
                  f"信号触发={'是' if lb.get('triggered') else '否'}")
+    prem = ev.get("lianban_premium_883958", {})
+    lines.append(f"883958当日涨跌幅: {prem.get('change_pct', 0)}% "
+                 f"溢价>3%={'是' if prem.get('triggered') else '否'}")
     wp = ev.get("weipan_883418", {})
     lines.append(f"883418微盘股: 涨跌幅={wp.get('change_pct', 0)}% "
                  f"安全(不深跌)={'是' if wp.get('safe') else '否'}")
@@ -868,7 +947,7 @@ def ai_judge(evidence: dict) -> dict:
           cycle_type, modes[], summary, gate_reason, mode_scores, confidence}
     """
     gate = hard_gate(evidence)
-    modes = score_modes(evidence) if gate["is_signal"] else []
+    modes = score_modes(evidence) if (gate["is_signal"] or gate["is_continuation"]) else []
 
     if not cfg.QWEN_API_KEY:
         return _assemble_result(gate, modes, None)
@@ -918,6 +997,9 @@ def _detect_raw(date_str: str) -> dict:
     2. ai_judge(evidence) — 模型判断起变信号
     3. 返回 {date, evidence, ai_result, ladder_df, scan_marks}
     """
+    import time as _time
+    if _DETECT_CACHE["key"] == date_str and _time.time() - _DETECT_CACHE["ts"] < _DETECT_TTL:
+        return _DETECT_CACHE["result"]
     evidence = build_evidence(date_str)
     ai_result = ai_judge(evidence)
     try:
@@ -938,13 +1020,15 @@ def _detect_raw(date_str: str) -> dict:
         pass
     ladder = get_ladder(date_str)
     scan_marks = scan_signals("883958", days=120)
-    return {
+    result = {
         "date": date_str,
         "evidence": evidence,
         "ai_result": ai_result,
         "ladder_df": ladder,
         "scan_marks": scan_marks,
     }
+    _DETECT_CACHE.update(key=date_str, result=result, ts=_time.time())
+    return result
 
 
 def detect(date_str: str) -> dict:
@@ -967,32 +1051,35 @@ def detect(date_str: str) -> dict:
     state = _load_signal_state()
     cached_date = state.get("signal_date", "")
 
-    if not cached_date:
-        lb = evidence.get("lianban_883958", {})
-        lb_date = ""
-        if lb.get("triggered") and lb.get("klines"):
-            lb_date = str(lb["klines"][-1]["日期"])
-        _save_signal_state({"signal_date": date_str, "lianban_trigger_date": lb_date})
-        return result
-
-    # 回测历史日期（早于或等于已缓存日期）不应用去重
-    if date_str <= cached_date:
-        return result
-
     lb = evidence.get("lianban_883958", {})
     current_lb = ""
     if lb.get("triggered") and lb.get("klines"):
-        current_lb = str(lb["klines"][-1]["日期"])
-    cached_lb = state.get("lianban_trigger_date", "")
+        current_lb = str(lb["klines"][-1]["日期"])[:10]
 
-    if current_lb and current_lb != cached_lb:
-        _save_signal_state({"signal_date": date_str, "lianban_trigger_date": current_lb})
+    if not cached_date:
+        # 首次触发：只有883958满足连阴跳空拉红时才写入周期缓存
+        # 避免非起变日（如由微盘安全触发的）覆盖缓存
+        if current_lb:
+            _save_signal_state({"signal_date": date_str,
+                                "lianban_trigger_date": current_lb})
         return result
 
-    # 起变信号被去重，但保留延续信号信息
+    # 回测历史日期或当天重复查询，不应用去重
+    if date_str <= cached_date:
+        return result
+
+    # date_str > cached_date：检查是否是新周期
+    # 新周期判断：883958满足连阴跳空拉红，且其日期在 cached_date 之后
+    if current_lb and current_lb > cached_date:
+        _save_signal_state({"signal_date": date_str,
+                            "lianban_trigger_date": current_lb})
+        return result
+
+    # 不是新周期，去重起变信号，但保留延续信号信息
     ai_result["is_signal"] = False
     ai_result["signal_reason"] = f"已于 {cached_date} 起变"
-    ai_result["modes"] = []
+    if not is_cont:
+        ai_result["modes"] = []
     base_summary = (
         f"起变信号已于 {cached_date} 触发，当前仍处于同一周期，"
         f"等待883958连板指数新一轮连阴→跳空高开拉红后再关注。"

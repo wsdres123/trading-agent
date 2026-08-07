@@ -38,7 +38,10 @@ for _d in (INDEX_CACHE_DIR, DATA_DIR):
 
 # ── 管理接口安全 ───────────────────────────────────────────────────────────
 # 允许的 UI 来源（CORS 白名单，同时用于 WebSocket Origin 校验）
-CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:8601").split(",")
+CORS_ORIGINS = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:8601,http://localhost:5173,http://127.0.0.1:8601,http://127.0.0.1:5173,http://127.0.0.1:8602,https://trade.jiecaiai.com",
+).split(",")
 
 
 # ── Qwen API（阿里千问，OpenAI 兼容端点）─────────────────────────────────

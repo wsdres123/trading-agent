@@ -65,8 +65,8 @@ def render():
                 f'<div style="color:{e(cfg.COLOR_TEXT)};margin-top:4px;white-space:pre-wrap;">'
                 f'{e(ai["summary"])}</div></div>', unsafe_allow_html=True)
 
-        # 三个子板块
-        ss_tabs = st.tabs(["📈 主线模式个股", "⚡ 短线模式个股", "💰 庄股"])
+        # 四个子板块
+        ss_tabs = st.tabs(["📈 主线模式个股", "⚡ 短线模式个股", "💰 庄股", "📊 趋势核心"])
 
         # ── 主线模式个股 ──
         with ss_tabs[0]:
@@ -189,7 +189,7 @@ def render():
         with ss_tabs[2]:
             st.markdown(
                 '<span class="chip">筛选: <span class="k">连续5日收盘&gt;MA5 · 自由流通&gt;30亿'
-                ' · 5日涨&gt;15% · 主板 · 30日涨&gt;40%</span></span>',
+                ' · 5日涨&gt;20% · 主板 · 30日涨&gt;50%</span></span>',
                 unsafe_allow_html=True)
             zg_df = res.get("zhuanggu")
             if zg_df is not None and not zg_df.empty:
@@ -220,6 +220,46 @@ def render():
                         st.markdown(f'<div class="muted">{e(s.get("reason", ""))}</div>',
                                     unsafe_allow_html=True)
 
+        # ── 趋势核心（无主线时）──
+        with ss_tabs[3]:
+            tc_data = res.get("trend_core_data", {})
+            if tc_data.get("triggered"):
+                ext = tc_data.get("external", {})
+                rc1, rc2 = st.columns([6, 1])
+                with rc1:
+                    st.markdown(
+                        f'<span class="chip">外部标准: <span class="k">{e(ext.get("reason", ""))}</span></span>',
+                        unsafe_allow_html=True)
+                with rc2:
+                    if st.button("🔄 刷新", key="tc_refresh",
+                                 use_container_width=True):
+                        with st.spinner("刷新趋势核心数据…"):
+                            st.session_state["ss_result"] = ss.run(str(ss_date))
+                            st.session_state.pop("ss_intra_code", None)
+                        st.rerun()
+                for c in ext.get("conditions", []):
+                    color = cfg.COLOR_UP if c["ok"] else cfg.COLOR_MUTED
+                    icon = "✅" if c["ok"] else "❌"
+                    st.markdown(
+                        f'<span class="chip" style="font-size:12px;">{icon} '
+                        f'{e(c["name"])}: <span class="k" style="color:{e(color)};">{e(c["value"])}</span>'
+                        f'</span>', unsafe_allow_html=True)
+                tc_stocks = tc_data.get("stocks")
+                if tc_stocks is not None and not tc_stocks.empty:
+                    st.markdown(
+                        f'<span class="chip">命中: <span class="k">{e(len(tc_stocks))}只</span>'
+                        f' · 自由流通>200亿 · 5日涨>20% · 10日涨>10% · 成交>30亿 · 收盘>3日线</span>',
+                        unsafe_allow_html=True)
+                    sortable_table(tc_stocks, pct_cols=("涨跌幅", "涨速"))
+                else:
+                    st.markdown('<div class="muted">（无符合条件的趋势核心个股）</div>',
+                                unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    '<div class="muted">（当前有主线或外部条件未满足，'
+                    '需无主线且指数反弹/情绪修复时触发）</div>',
+                    unsafe_allow_html=True)
+
         # ── 分时图 ──
         stock_pairs: list[tuple[str, str]] = []
         for df_key in ("zhuanggu", "mainline_display", "shortterm_display"):
@@ -227,6 +267,11 @@ def render():
             if df is not None and not df.empty:
                 for _, r in df.iterrows():
                     stock_pairs.append((str(r["代码"]), str(r.get("名称", ""))))
+        tc_data = res.get("trend_core_data", {})
+        tc_stocks = tc_data.get("stocks") if tc_data.get("triggered") else None
+        if tc_stocks is not None and not tc_stocks.empty:
+            for _, r in tc_stocks.iterrows():
+                stock_pairs.append((str(r["代码"]), str(r.get("名称", ""))))
         stock_pairs = list(dict.fromkeys(stock_pairs))
         if stock_pairs:
             st.markdown("---")

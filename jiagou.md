@@ -5,27 +5,31 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    用户浏览器                             │
-│              http://localhost:8601                         │
+│        http://localhost:5173 (dev) 或 :8602 (prod)       │
 └──────────────┬──────────────────────────┬────────────────┘
                │                          │
                ▼                          ▼
 ┌──────────────────────┐   ┌──────────────────────────────┐
-│  Streamlit UI (8601) │   │  FastAPI 后端 (8602)          │
-│  ui.py               │   │  server.py                    │
-│                      │   │                               │
-│  7 大功能页面:        │   │  后台预热任务 (自适应频率):    │
-│  · 指数择时           │   │  · 全市场快照/指数/热门股     │
-│  · 主线模式           │   │  · 指数日K/同花顺指数日K     │
-│  · 短线模式           │   │  · 健康检查/每日快照         │
-│  · 个股模式           │   │                               │
-│  · 明日推演           │   │  REST: /api/freshness 等      │
-│  · AI助手             │   │  WS: /ws/market /ws/quotes    │
+│  React 前端 (5173)   │   │  FastAPI 后端 (8602)          │
+│  frontend/           │   │  server.py                    │
+│  Vite+React18+TS     │   │                               │
+│  Tailwind CSS        │   │  后台预热任务 (自适应频率):    │
+│  ECharts K线/分时    │   │  · 全市场快照/指数/热门股     │
+│                      │   │  · 指数日K/同花顺指数日K     │
+│  7 大功能页面:        │   │  · 健康检查/每日快照         │
+│  · 指数择时           │   │                               │
+│  · 主线模式           │   │  REST: /api/* 全量端点        │
+│  · 短线模式           │   │  WS: /ws/market /ws/quotes    │
+│  · 个股模式           │   │  静态挂载: frontend/dist      │
+│  · 明日推演           │   │                               │
+│  · AI助手             │   │                               │
 │  · 评测报告           │   │                               │
 │                      │   │                               │
 │  数据获取:            │   │                               │
-│  data.py @ttl_cache  │◄──│                               │
-│  L1→L2 Redis→ts_store│   │                               │
-│  图表: Plotly         │   │                               │
+│  fetch→/api/*         │◄──│                               │
+│  WS→/ws/market增量   │   │                               │
+│  状态: TanStack Query │   │                               │
+│  + Zustand            │   │                               │
 └──────┬───────────────┘   └──────┬───────────────────────┘
        │                          │
        │   ┌──────────────────────┘
@@ -60,8 +64,8 @@
 
 | 层级 | 技术 | 用途 |
 |------|------|------|
-| 前端 | Streamlit + Plotly | Web 界面 + K线/分时图表 |
-| 后端 | FastAPI + Uvicorn | 异步 REST + WebSocket |
+| 前端 | React 18 + TypeScript + Vite + Tailwind CSS | Web 界面 + ECharts K线/分时图表 |
+| 后端 | FastAPI + Uvicorn | 异步 REST + WebSocket + 静态服务 |
 | 缓存 | Redis 7 + 进程内存 | L2 TTL + L0 热数据 |
 | 存储 | Parquet (ts_store) | 历史K线 + 每日快照 |
 | 数据 | pandas / httpx / requests | 清洗 + 异步/同步 HTTP |
@@ -74,10 +78,12 @@
 | 进程 | 端口 | 职责 |
 |------|------|------|
 | Redis | 6379 | TTL 缓存 |
-| FastAPI | 8602 | 7个后台预热 + REST + WebSocket |
-| Streamlit | 8601 | 用户界面 |
+| FastAPI | 8602 | 7个后台预热 + REST + WebSocket + 静态服务(prod) |
+| React dev server | 5173 | Vite 开发服务器 (dev only, proxy→8602) |
 
 启动: `run.sh`(前台) / `start.sh`(后台) / `stop.sh`(停止)
+前端开发: `cd frontend && npm run dev` → http://localhost:5173
+前端构建: `cd frontend && npm run build` → FastAPI 同域 http://localhost:8602 提供
 
 ## 四、核心模块
 
@@ -125,9 +131,9 @@
 |------|------|
 | `src/stock_filter.py` | 选股筛选：粗筛→精筛，分组按用户隔离 |
 | `src/auth.py` | 多用户登录：SQLite+bcrypt+Redis 会话+失败锁定+CLI |
-| `src/realtime_widget.py` | 实时行情 bar：浏览器直连 /ws/market 增量更新 DOM（痛点3） |
-| `server.py` | FastAPI：预热 + REST + WebSocket 广播 |
-| `ui.py` | Streamlit：登录拦截 + 7大功能页面 + 评测报告 |
+| `src/realtime_widget.py` | [旧] 实时行情 bar JS（Streamlit 版，React 用 ws.ts hook 替代） |
+| `server.py` | FastAPI：预热 + REST（含前端 API）+ WebSocket 广播 + 静态服务 |
+| `ui.py` | [旧] Streamlit UI（保留兼容，待退役） |
 | `config/settings.py` | 全局配置 |
 
 ## 五、数据流
@@ -137,24 +143,59 @@
   FastAPI 后台(自适应间隔) → async_fetch → 腾讯/新浪/东财/同花顺
     → Redis(TTL) + ts_store(parquet)
     → ws_hub 发布 Redis Pub/Sub(jc:quotes) → /ws/market 广播给所有前端
-  Streamlit 页面 → data.py @ttl_cache → L0→L2→parquet→HTTP → Plotly
-  浏览器行情bar(realtime_widget) → 直连 /ws/market → 增量更新DOM(不整页刷新)
+  React 页面 → fetch /api/* → TanStack Query 缓存 → ECharts 渲染
+  React MarketBar → 直连 /ws/market → WS hook 增量更新(无整页刷新)
 
 LLM 分析流:
   docs/*.md + knowledge/*.csv → RAG(BM25+embedding→RRF)
-    → 盘面统计 + LLM(qwen-plus) → JSON → .data/*_ai.json → Streamlit
+    → 盘面统计 + LLM(qwen-plus) → JSON → .data/*_ai.json → /api/* → React
 
 AI 助手:
-  用户输入 → RAG+记忆检索 → chat_stream(qwen-plus)
-    → 需要数据？→ market_tools(最多3轮) → st.write_stream()
+  用户输入 → /api/chat/stream (SSE) → RAG+记忆检索 → chat_stream(qwen-plus)
+    → 需要数据？→ market_tools(最多3轮) → SSE 流式推送给 React
 ```
 
 ## 六、文件清单
 
 ```
 trading-agent_new/
-├── ui.py                      # Streamlit UI
-├── server.py                  # FastAPI 后端
+├── frontend/                  # React 18 前端工程
+│   ├── package.json
+│   ├── vite.config.ts          # proxy /api /ws → 8602
+│   ├── tsconfig.json
+│   ├── tailwind.config.js      # 复刻 COLOR_* 主题
+│   ├── index.html
+│   └── src/
+│       ├── main.tsx            # React 入口
+│       ├── App.tsx             # 路由 + 认证守卫 + 页面切换
+│       ├── index.css           # Tailwind + 全局黑底样式
+│       ├── store/
+│       │   ├── auth.ts         # Zustand: token/user
+│       │   └── nav.ts          # 当前页面选择
+│       ├── api/
+│       │   ├── client.ts       # fetch 封装 + token 注入 + SSE
+│       │   ├── ws.ts           # WebSocket hooks (useMarketWS/useQuoteWS)
+│       │   └── endpoints.ts    # 所有 API 端点定义
+│       ├── components/
+│       │   ├── Layout.tsx      # 顶栏 + 功能导航 + 状态chip
+│       │   ├── MarketBar.tsx   # WS 实时行情条
+│       │   ├── StockTable.tsx  # 涨红跌绿黄字排序表(虚拟滚动)
+│       │   ├── KLineChart.tsx  # ECharts 蜡烛图 (MA + 信号标记)
+│       │   ├── IntradayChart.tsx # 分时图
+│       │   ├── Chip.tsx        # 标签芯片
+│       │   ├── StatBox.tsx     # 统计卡片
+│       │   └── Login.tsx       # 登录页
+│       └── pages/
+│           ├── Timing.tsx       # 指数择时
+│           ├── Theme.tsx       # 主线模式
+│           ├── ShortTerm.tsx   # 短线模式
+│           ├── SingleStock.tsx # 个股模式
+│           ├── Tomorrow.tsx    # 明日推演
+│           ├── AIAssistant.tsx # AI助手
+│           └── EvalReport.tsx  # 评测报告
+├── server.py                  # FastAPI 后端 (REST + WS + 静态服务)
+├── ui.py                      # [旧] Streamlit UI (保留兼容，待退役)
+├── pages/                     # [旧] Streamlit 页面 (保留兼容)
 ├── run.sh / start.sh / stop.sh
 ├── config/
 │   ├── settings.py            # 全局配置
@@ -402,9 +443,64 @@ qwen-plus 初判 → Schema 校验
 
 ## 十一、已知限制
 
-1. **实时行情仍受上游轮询节奏限制** — 免费源 HTTP 30s 轮询，WS 推送的"实时性"目前是 30s 粒度（但已消除整页闪烁、多客户端不再放大上游请求）；L2 凭证接入 `ws_source.py` 后才真正毫秒级
+1. **实时行情仍受上游轮询节奏限制** — 免费源 HTTP 30s 轮询，WS 推送的"实时性"目前是 30s 粒度（React 前端无整页 rerun，增量更新丝滑）；L2 凭证接入 `ws_source.py` 后才真正毫秒级
 2. **上游免费数据源无 WebSocket** — 腾讯/新浪/东财/Fuyao 均为 HTTP 轮询；已建 L2 抽象层(`src/ws_source.py`)，待付费凭证
-3. **明日推演 UI 未接入** — 后端逻辑完整，前端未展示
+3. **明日推演前端待完善** — 后端逻辑完整，React 页面为占位，待接入展示
 4. **memory.py 分层记忆待实现** — 接口已完成，写入逻辑待接入
 5. **GLIBCXX 依赖** — 必须设置 `LD_LIBRARY_PATH`
-6. **会话 token 在 URL 中** — Streamlit 1.30 无 cookie API；仅限 Tailscale 内网使用，公网开放前须升级 Streamlit 或前置 Nginx 登录
+6. **Streamlit 旧 UI 保留兼容** — `ui.py` + `pages/` 保留为后备，React 前端验证完毕后退役
+7. **React 生产构建 token 存 localStorage** — 开发阶段用 localStorage 存 token，公网开放前应升级为 HttpOnly Cookie + SameSite（配合 Nginx 反向代理）
+
+## 十二、前端架构（React 迁移）
+
+### 12.1 技术选型
+
+| 技术 | 用途 |
+|------|------|
+| React 18 + TypeScript | 组件化 UI，类型安全 |
+| Vite | 开发服务器 + 构建工具 |
+| Tailwind CSS | 原子化样式，复刻黑底/黄字/红涨绿跌主题 |
+| ECharts (echarts-for-react) | K线蜡烛图 + 分时图 + 柱状图 |
+| TanStack Query | 服务端状态管理 + 轮询缓存 |
+| Zustand | 轻量客户端状态（auth/nav） |
+| React Router DOM | 路由 + 认证守卫 |
+
+### 12.2 API 端点全量
+
+React 前端通过 Vite dev proxy 或 FastAPI StaticFiles 同域访问后端：
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/api/login` | POST | 用户名密码 → {token, user} |
+| `/api/logout` | POST | 删除会话 |
+| `/api/me` | GET | 当前用户信息 |
+| `/api/timing` | GET | 今日择时判断 |
+| `/api/timing/judge` | POST | 强制重新判断择时 |
+| `/api/timing/signals` | GET | 历史多空转信号 |
+| `/api/emotion` | GET | 今日情绪节点 |
+| `/api/emotion/judge` | POST | 强制重新判断情绪 |
+| `/api/avg_price_kline` | GET | 平均股价日K |
+| `/api/market_stats` | GET | 盘面统计 |
+| `/api/market_turnover` | GET | 全市场成交额 |
+| `/api/spot` | GET | 全市场实时行情 |
+| `/api/index` | GET | 指数实时行情 |
+| `/api/hot` | GET | 热门股 |
+| `/api/quote/{code}` | GET | 个股行情 |
+| `/api/avg_price` | GET | 实时均价 |
+| `/api/index_daily/{symbol}` | GET | 指数日K |
+| `/api/chat/stream` | POST | SSE 流式聊天 |
+| `/api/groups` | GET/POST | 分组 CRUD |
+| `/api/filter` | POST | 自然语言筛选 |
+| `/api/short_term` | POST | 短线模式分析 |
+| `/api/theme` | POST | 主线识别 |
+| `/api/theme/ai` | POST | AI主线判断 |
+| `/api/single_stock` | POST | 个股筛选+AI判断 |
+| `/api/eval/run` | POST | 运行评测 |
+| `/ws/market` | WS | 全市场行情推送 |
+| `/ws/quotes/{code}` | WS | 个股行情推送 |
+
+### 12.3 部署形态
+
+- **开发**：`cd frontend && npm run dev` → Vite dev server (5173)，proxy `/api` 和 `/ws` 到 8602
+- **生产**：`cd frontend && npm run build` → `frontend/dist/` → FastAPI StaticFiles 同域挂载，访问 `http://localhost:8602` 直接提供 React 前端
+- **CORS**：开发环境白名单含 `localhost:5173`；生产同域无跨域问题

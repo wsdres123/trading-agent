@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #0e0e0e;
+  color: #ffffff;
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+  font-size: 18px;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer components {
+  .stat-box {
+    @apply bg-panel border border-border rounded-lg p-3;
+  }
+  .stat-box .label {
+    @apply text-xs text-muted;
+  }
+  .stat-box .val {
+    @apply text-2xl font-bold mt-1;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-sm rounded border border-border bg-panel;
+  }
+  .chip .k {
+    @apply text-stock font-semibold;
+  }
+  .muted {
+    @apply text-muted text-sm;
+  }
+  .stk {
+    @apply text-stock font-semibold;
+  }
+  .up {
+    @apply text-up font-semibold;
+  }
+  .down {
+    @apply text-down font-semibold;
+  }
+  .btn {
+    @apply px-3 py-1.5 rounded-lg border border-border bg-panel text-text cursor-pointer transition-colors hover:border-stock;
+  }
+  .btn-primary {
+    @apply px-3 py-1.5 rounded-lg bg-accent text-white cursor-pointer border border-accent hover:opacity-80;
+  }
+  .tab-active {
+    @apply border-stock text-stock;
+  }
+  .table-th {
+    @apply bg-[#242424] px-2.5 py-2 text-left whitespace-nowrap cursor-pointer select-none sticky top-0 border-b-2 border-border;
+  }
+  .table-td {
+    @apply px-2.5 py-2 border-b border-[#222] whitespace-nowrap;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #141414;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}

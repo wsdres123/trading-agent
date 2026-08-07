@@ -68,6 +68,12 @@ async def lifespan(app: FastAPI):
     )
     # 启动即校准本地时钟（行情源 Date 头），信号时间戳统一走 clock.now()
     await clock.sync(_http_client)
+    # 预热 LLM 连接（复用 httpx 连接池）
+    try:
+        from src.llm_gateway import _get_client
+        _get_client()
+    except Exception:
+        pass
     tasks = [
         asyncio.create_task(_bg_refresh_spot()),
         asyncio.create_task(_bg_refresh_index()),
@@ -640,20 +646,40 @@ async def api_freshness():
     }
 
 
+def _auth_user(authorization: str | None = Header(default=None)) -> str | None:
+    """从 Authorization: Bearer <token> 提取用户名。"""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    from src import auth
+    token = authorization[7:]
+    user = auth.get_session_user(token)
+    if user:
+        auth.touch_session(token)
+    return user
+
+
+def _require_auth(authorization: str | None = Header(default=None)) -> str:
+    """要求登录，返回用户名。"""
+    user = _auth_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="未登录或会话过期")
+    return user
+
+
 @app.get("/api/spot")
-async def api_spot():
+async def api_spot(user: str = Depends(_require_auth)):
     df = await async_fetch.get_stock_spot_fast_async(_http_client)
     return df.to_dict("records")
 
 
 @app.get("/api/index")
-async def api_index():
+async def api_index(user: str = Depends(_require_auth)):
     df = await async_fetch.sina_index_spot_async(_http_client)
     return df.to_dict("records")
 
 
 @app.get("/api/hot")
-async def api_hot():
+async def api_hot(user: str = Depends(_require_auth)):
     spot_key = _cache_key("get_stock_spot", (), {})
     spot_df = redis_get(spot_key)
     df = await async_fetch.get_hot_stocks_async(
@@ -662,17 +688,17 @@ async def api_hot():
 
 
 @app.get("/api/quote/{code}")
-async def api_quote(code: str):
+async def api_quote(code: str, user: str = Depends(_require_auth)):
     return await async_fetch.get_stock_quote_fast_async(_http_client, code)
 
 
 @app.get("/api/avg_price")
-async def api_avg_price():
+async def api_avg_price(user: str = Depends(_require_auth)):
     return await async_fetch.get_realtime_avg_price_async(_http_client)
 
 
 @app.get("/api/trade-calendar")
-async def api_trade_calendar():
+async def api_trade_calendar(user: str = Depends(_require_auth)):
     """A股交易日历。"""
     dates = data.get_trade_calendar()
     return {"count": len(dates), "first": dates[0] if dates else None,
@@ -680,7 +706,7 @@ async def api_trade_calendar():
 
 
 @app.get("/api/securities")
-async def api_securities(date: str | None = None):
+async def api_securities(date: str | None = None, user: str = Depends(_require_auth)):
     """证券主数据快照（代码/名称/ST状态）。date 为空返回当日，否则返回时点股票池。"""
     if date is None:
         df = data.get_securities_snapshot()
@@ -692,8 +718,16 @@ async def api_securities(date: str | None = None):
 
 
 @app.get("/api/index_daily/{symbol}")
-async def api_index_daily(symbol: str, days: int = 380):
-    df = await async_fetch.get_index_daily_async(_http_client, symbol, days)
+async def api_index_daily(symbol: str, days: int = 380, user: str = Depends(_require_auth)):
+    # 同花顺指数（88xxxx）走已实现的同花顺指数接口
+    if symbol.startswith("88"):
+        def _ths_fetch():
+            from src import data
+            df = data.get_ths_index_daily(symbol, days=days)
+            return df
+        df = await asyncio.to_thread(_ths_fetch)
+    else:
+        df = await async_fetch.get_index_daily_async(_http_client, symbol, days)
     return df.to_dict("records")
 
 
@@ -735,12 +769,514 @@ async def api_eval_report(_=Depends(_require_api_key)):
     return {"task_id": task_id, "status": "submitted" if task_id else "celery_disabled"}
 
 
+# ── Auth endpoints (React frontend) ─────────────────────────────────────────
+
+
+@app.post("/api/login")
+async def api_login(body: dict = Body(...)):
+    from src import auth
+    username = body.get("username", "")
+    password = body.get("password", "")
+    if auth.is_locked(username):
+        raise HTTPException(
+            status_code=429,
+            detail="账户已锁定，请15分钟后重试",
+            headers={"Retry-After": str(auth.LOCK_SECONDS)},
+        )
+    user = auth.verify(username, password)
+    if not user:
+        if auth.is_locked(username):
+            raise HTTPException(
+                status_code=429,
+                detail="连续失败过多，账户已锁定15分钟",
+                headers={"Retry-After": str(auth.LOCK_SECONDS)},
+            )
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    token = auth.create_session(user)
+    return {"token": token, "user": user}
+
+
+@app.post("/api/logout")
+async def api_logout(authorization: str | None = Header(default=None)):
+    from src import auth
+    token = (authorization or "").replace("Bearer ", "")
+    auth.delete_session(token)
+    return {"status": "ok"}
+
+
+@app.get("/api/me")
+async def api_me(user: str = Depends(_require_auth)):
+    from src import auth
+    users = auth.list_users()
+    role = next((u["role"] for u in users if u["username"] == user), "user")
+    return {"user": user, "role": role}
+
+
+# ── Timing / Emotion / Market data (React frontend) ────────────────────────
+@app.get("/api/timing")
+async def api_timing(user: str = Depends(_require_auth)):
+    """今日指数择时判断。"""
+    import asyncio, time as _time
+    from src import index_timing as it
+
+    today = _time.strftime("%Y-%m-%d")
+    rec = await asyncio.to_thread(it.load_ai_predictions)
+    today_rec = rec.get(today, {}) if rec else {}
+    turnover = await asyncio.to_thread(it.market_turnover_wanyi)
+    signals = await asyncio.to_thread(it.all_signals)
+    hint = it.pattern_hint(signals) if signals else ""
+    hist = await asyncio.to_thread(it.load_history_signals)
+    latest = None
+    if hist is not None and not hist.empty:
+        row = hist.iloc[-1]
+        latest = {"日期": str(row.get("日期", "")), "信号": str(row.get("信号", "")),
+                   "中级周期": str(row.get("中级周期", "")), "情绪周期": str(row.get("情绪周期", "")),
+                   "指数": str(row.get("指数", ""))}
+
+    if it.should_auto_judge() and not today_rec:
+        await asyncio.to_thread(it.ai_judge)
+        rec = await asyncio.to_thread(it.load_ai_predictions)
+        today_rec = rec.get(today, {}) if rec else {}
+
+    return {
+        "signal": today_rec.get("signal", ""),
+        "mid_cycle": today_rec.get("mid_cycle", "-"),
+        "position": today_rec.get("position", "-"),
+        "reason": today_rec.get("reason", ""),
+        "time": today_rec.get("time", ""),
+        "turnover": turnover,
+        "pattern_hint": hint,
+        "latest_review": latest,
+    }
+
+
+@app.post("/api/timing/judge")
+async def api_timing_judge(user: str = Depends(_require_auth)):
+    import asyncio
+    from src import index_timing as it
+    result = await asyncio.to_thread(it.ai_judge, True)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+    return {"status": "ok", "result": result}
+
+
+@app.get("/api/timing/signals")
+async def api_timing_signals(user: str = Depends(_require_auth)):
+    import asyncio
+    from src import index_timing as it
+    signals = await asyncio.to_thread(it.all_signals)
+    return {"signals": signals}
+
+
+@app.get("/api/emotion")
+async def api_emotion(user: str = Depends(_require_auth)):
+    import asyncio, time as _time
+    from src import emotion_node as en
+
+    today = _time.strftime("%Y-%m-%d")
+    recs = await asyncio.to_thread(en.load_predictions)
+    today_rec = recs.get(today, {}) if recs else {}
+    daban = await asyncio.to_thread(en.daban_damian_count)
+
+    if en.should_auto_judge() and not today_rec:
+        await asyncio.to_thread(en.ai_judge)
+        recs = await asyncio.to_thread(en.load_predictions)
+        today_rec = recs.get(today, {}) if recs else {}
+
+    return {
+        "node": today_rec.get("node", ""),
+        "stats": today_rec.get("stats", {}),
+        "prev_stats": today_rec.get("prev_stats", {}),
+        "reason": today_rec.get("reason", ""),
+        "advice": today_rec.get("advice", ""),
+        "time": today_rec.get("time", ""),
+        "daban_damian": daban,
+    }
+
+
+@app.post("/api/emotion/judge")
+async def api_emotion_judge(user: str = Depends(_require_auth)):
+    import asyncio
+    from src import emotion_node as en
+    result = await asyncio.to_thread(en.ai_judge, True)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+    return {"status": "ok", "result": result}
+
+
+@app.get("/api/avg_price_kline")
+async def api_avg_price_kline(days: int = 360, user: str = Depends(_require_auth)):
+    import asyncio
+    from src import index_timing as it
+    df = await asyncio.to_thread(it.avg_price_kline, days)
+    if df is None or df.empty:
+        return {"data": []}
+    df = df.fillna(0)
+    cols = {c: c for c in df.columns}
+    records = df.rename(columns=cols).to_dict("records")
+    for r in records:
+        for k, v in r.items():
+            if hasattr(v, "item"):
+                r[k] = v.item()
+            elif isinstance(v, float) and (v != v):
+                r[k] = None
+    return {"data": records}
+
+
+@app.get("/api/market_stats")
+async def api_market_stats(user: str = Depends(_require_auth)):
+    import asyncio, time as _time
+    from src import emotion_node as en
+    daban = await asyncio.to_thread(en.daban_damian_count)
+    today = _time.strftime("%Y-%m-%d")
+    recs = await asyncio.to_thread(en.load_predictions)
+    today_rec = recs.get(today, {}) if recs else {}
+    stats = today_rec.get("stats", {})
+    return {"打板大面数": daban, **stats}
+
+
+@app.get("/api/market_turnover")
+async def api_market_turnover(user: str = Depends(_require_auth)):
+    import asyncio
+    from src import index_timing as it
+    to = await asyncio.to_thread(it.market_turnover_wanyi)
+    return {"turnover": to}
+
+
+# ── Chat SSE ────────────────────────────────────────────────────────────────
+from fastapi.responses import StreamingResponse
+
+
+@app.post("/api/chat/stream")
+async def api_chat_stream(body: dict = Body(...), user: str = Depends(_require_auth)):
+    from src import ai_assistant as ai
+    question = body.get("question", "")
+    history = body.get("history", [])
+
+    async def gen():
+        loop = asyncio.get_event_loop()
+        import queue, threading
+        q: queue.Queue = queue.Queue()
+        done = object()
+        def _worker():
+            try:
+                for chunk in ai.chat_stream(question, history=history):
+                    q.put(chunk)
+            except Exception as e:
+                q.put(e)
+            finally:
+                q.put(done)
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+        while True:
+            item = await loop.run_in_executor(None, q.get)
+            if item is done:
+                break
+            if isinstance(item, Exception):
+                yield f"data: [ERROR: {item}]\n"
+                break
+            yield f"data: {item}\n"
+
+    return StreamingResponse(
+        gen(), media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+# ── Groups (React frontend) ─────────────────────────────────────────────────
+@app.get("/api/groups")
+async def api_groups(user: str = Depends(_require_auth)):
+    from src import stock_filter as sf
+    groups = sf.list_groups(user)
+    return groups
+
+
+@app.post("/api/groups")
+async def api_groups_action(body: dict = Body(...), user: str = Depends(_require_auth)):
+    from src import stock_filter as sf
+    action = body.get("action", "")
+    name = body.get("name", "")
+    if action == "save":
+        conditions = body.get("conditions", [])
+        stocks = body.get("stocks", [])
+        sf.save_group(name, conditions, stocks, username=user)
+        return {"status": "ok"}
+    elif action == "update":
+        result = sf.update_group(name, username=user)
+        if not result:
+            raise HTTPException(status_code=500, detail="更新失败")
+        return {"status": "ok", "group": result}
+    elif action == "delete":
+        sf.delete_group(name, username=user)
+        return {"status": "ok"}
+    raise HTTPException(status_code=400, detail="unknown action")
+
+
+# ── Filter (React frontend) ────────────────────────────────────────────────
+@app.post("/api/filter")
+async def api_filter(body: dict = Body(...), user: str = Depends(_require_auth)):
+    import asyncio
+    from src import data, stock_filter as sf, ai_assistant as ai
+    action = body.get("action", "")
+
+    if action == "cache_status":
+        return await asyncio.to_thread(data.metrics_cache_status)
+    elif action == "parse":
+        desc = body.get("desc", "")
+        parsed = await asyncio.to_thread(ai.parse_filter_conditions, desc)
+        # Add labels
+        from pages.shared import cond_labels
+        for c in parsed.get("conditions", []):
+            c["label"] = None
+        labels = cond_labels(parsed.get("conditions", []))
+        for c, l in zip(parsed.get("conditions", []), labels):
+            c["label"] = l
+        return parsed
+    elif action == "exec":
+        conditions = body.get("conditions", [])
+        if data.load_metrics_cache(allow_stale=True) is None:
+            await asyncio.to_thread(data.build_metrics_cache)
+        res = await asyncio.to_thread(sf.run_filter, conditions)
+        if not res.empty:
+            res = await asyncio.to_thread(sf.finalize_results, res)
+        res = res.fillna(0)
+        records = res.to_dict("records")
+        for r in records:
+            for k, v in r.items():
+                if hasattr(v, "item"):
+                    r[k] = v.item()
+                elif isinstance(v, float) and (v != v):
+                    r[k] = None
+        return {"stocks": records}
+    raise HTTPException(status_code=400, detail="unknown action")
+
+
+# ── Short term / Theme / Single stock (React frontend) ─────────────────────
+@app.post("/api/short_term")
+async def api_short_term(body: dict = Body(...), user: str = Depends(_require_auth)):
+    import asyncio
+    from src import short_term as stm
+    date_str = body.get("date", "")
+    result = await asyncio.to_thread(stm.detect, date_str)
+    return _serialize_result(result)
+
+
+@app.post("/api/theme")
+async def api_theme(body: dict = Body(...), user: str = Depends(_require_auth)):
+    import asyncio
+    from src import theme_mode as tm
+    start = body.get("start", "")
+    end = body.get("end", "")
+    result = await asyncio.to_thread(tm.detect, start, end)
+    return _serialize_result(result)
+
+
+@app.post("/api/theme/ai")
+async def api_theme_ai(body: dict = Body(...), user: str = Depends(_require_auth)):
+    import asyncio
+    from src import theme_mode as tm
+    data = body.get("data", {})
+    text = await asyncio.to_thread(tm.ai_analyze, data)
+    return {"text": text}
+
+
+@app.get("/api/theme/capacity_limit")
+async def api_theme_capacity_limit(user: str = Depends(_require_auth)):
+    """昨日容量涨停次日观察：昨日涨停 + 成交额>30亿 + 流通市值>200亿，今日表现。"""
+    def _run():
+        try:
+            import pandas as pd
+            from datetime import datetime, timedelta
+            from src import ths_data
+            from src.short_term import get_zt_pool_ths
+
+            # 昨日（跳周末）
+            today = datetime.now()
+            offset = 1
+            while True:
+                yd_dt = today - timedelta(days=offset)
+                if yd_dt.weekday() < 5:
+                    break
+                offset += 1
+            yd = yd_dt.strftime("%Y-%m-%d")
+
+            # 用同花顺涨停池（当日数据，今天调用取今天，需要昨日的历史数据）
+            # 同花顺 limit-up-pool 只有当日，用 akshare 作为昨日数据源
+            try:
+                import akshare as ak
+                df = ak.stock_zt_pool_em(date=yd.replace("-", ""))
+            except Exception as e:
+                return {"date": yd, "stocks": [], "error": f"昨日涨停池获取失败: {e}"}
+            if df is None or df.empty:
+                return {"date": yd, "stocks": [], "error": "昨日涨停池为空"}
+
+            # 列名归一
+            col_map = {}
+            for c in df.columns:
+                cl = c.strip()
+                if "代码" in cl: col_map[c] = "代码"
+                elif "名称" in cl: col_map[c] = "名称"
+                elif "成交额" in cl: col_map[c] = "成交额"
+                elif "流通市值" in cl: col_map[c] = "流通市值"
+                elif "连板" in cl: col_map[c] = "连板数"
+                elif "所属行业" in cl or "行业" in cl: col_map[c] = "所属行业"
+            df = df.rename(columns=col_map)
+            for col in ("成交额", "流通市值"):
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+            # 筛选：成交额>30亿 + 流通市值>200亿
+            mask = pd.Series([True] * len(df), index=df.index)
+            if "成交额" in df.columns:
+                mask &= df["成交额"] > 30e8
+            if "流通市值" in df.columns:
+                mask &= df["流通市值"] > 200e8
+            df = df[mask].copy()
+            if df.empty:
+                return {"date": yd, "stocks": [], "avg_up": None, "avg_down": None,
+                        "up_count": 0, "down_count": 0, "total": 0}
+
+            codes = [str(r).zfill(6) for r in df["代码"].tolist()]
+
+            # 用同花顺 snapshot_batch 批量取今日行情
+            snap = ths_data.snapshot_batch(codes)
+            snap_map: dict = {}
+            if not snap.empty:
+                for _, sr in snap.iterrows():
+                    snap_map[str(sr.get("代码", "")).zfill(6)] = sr
+
+            rows = []
+            for _, r in df.iterrows():
+                code = str(r.get("代码", "")).zfill(6)
+                sr = snap_map.get(code, {})
+                pct = float(sr["涨跌幅"]) if hasattr(sr, "__getitem__") and sr.get("涨跌幅") is not None else None
+                rows.append({
+                    "代码": code,
+                    "名称": str(r.get("名称", "")),
+                    "昨成交额(亿)": round(float(r["成交额"]) / 1e8, 1) if pd.notna(r.get("成交额")) else None,
+                    "流通市值(亿)": round(float(r["流通市值"]) / 1e8, 0) if pd.notna(r.get("流通市值")) else None,
+                    "连板数": int(r["连板数"]) if "连板数" in r.index and pd.notna(r.get("连板数")) else 1,
+                    "所属行业": str(r.get("所属行业", "")),
+                    "今日涨跌幅": pct,
+                    "今日最新价": float(sr["最新价"]) if hasattr(sr, "__getitem__") and sr.get("最新价") is not None else None,
+                })
+            pcts = [x["今日涨跌幅"] for x in rows if x["今日涨跌幅"] is not None]
+            up_count = sum(1 for p in pcts if p > 0)
+            down_count = sum(1 for p in pcts if p <= 0)
+            avg_up = round(sum(p for p in pcts if p > 0) / up_count, 2) if up_count else None
+            avg_down = round(sum(p for p in pcts if p <= 0) / down_count, 2) if down_count else None
+            return {
+                "date": yd,
+                "stocks": sorted(rows, key=lambda x: -(x["今日涨跌幅"] or -999)),
+                "avg_up": avg_up, "avg_down": avg_down,
+                "up_count": up_count, "down_count": down_count, "total": len(rows),
+            }
+        except Exception as e:
+            return {"date": "", "stocks": [], "error": str(e)}
+
+    return await asyncio.to_thread(_run)
+
+
+
+@app.post("/api/single_stock")
+async def api_single_stock(body: dict = Body(...), user: str = Depends(_require_auth)):
+    import asyncio
+    from src import single_stock as ss
+    date_str = body.get("date", "")
+    result = await asyncio.to_thread(ss.run, date_str)
+    return _serialize_result(result)
+
+
+def _serialize_result(obj):
+    """递归序列化含 DataFrame/numpy 的结果为 JSON 安全的 dict。"""
+    import pandas as pd
+    import numpy as np
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return {k: _serialize_result(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_serialize_result(v) for v in obj]
+    if isinstance(obj, pd.DataFrame):
+        obj = obj.fillna(0)
+        return obj.to_dict("records")
+    if isinstance(obj, pd.Series):
+        return obj.to_dict()
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, float) and obj != obj:
+        return None
+    return obj
+
+
+# ── Eval run (React frontend) ──────────────────────────────────────────────
+@app.get("/api/data_status")
+async def api_data_status(user: str = Depends(_require_auth)):
+    """检查评测数据文件是否存在及行数。"""
+    from pathlib import Path
+    base = Path(__file__).parent / "eval" / "datasets"
+    files = {
+        "情绪节点": "emotion_cases.jsonl",
+        "指数择时": "timing_cases.jsonl",
+        "筛选NLP": "filter_nlp.jsonl",
+        "RAG检索": "rag_queries.jsonl",
+    }
+    result = {}
+    for name, fname in files.items():
+        p = base / fname
+        if p.exists():
+            with open(p, encoding="utf-8") as f:
+                result[name] = sum(1 for _ in f)
+        else:
+            result[name] = 0
+    return result
+
+
+@app.post("/api/eval/run")
+async def api_eval_run(body: dict = Body(...), user: str = Depends(_require_auth)):
+    import asyncio, importlib as il
+    mode = body.get("mode", "no_llm")
+    modules_map = {
+        "no_llm": [
+            ("数据准确性", "eval.test_data_accuracy"),
+            ("情绪节点", "eval.test_emotion"),
+            ("指数择时", "eval.test_timing"),
+            ("输出可靠性", "eval.test_output_reliability"),
+            ("真实交易质量", "eval.test_trading_quality"),
+            ("筛选NLP解析", "eval.test_filter_nlp"),
+            ("RAG检索质量", "eval.test_rag_recall"),
+            ("性能基准", "eval.test_benchmark"),
+        ],
+        "all": [
+            ("LLM输出质量", "eval.test_llm_quality"),
+            ("工具路由", "eval.test_tool_routing"),
+        ],
+        "filter": [("筛选NLP解析", "eval.test_filter_nlp")],
+    }
+    if mode == "filter":
+        modules = modules_map["filter"]
+    elif mode == "all":
+        modules = modules_map["no_llm"] + modules_map["all"]
+    else:
+        modules = modules_map["no_llm"]
+
+    results = {}
+    for name, mod_path in modules:
+        try:
+            mod = il.import_module(mod_path)
+            r = await asyncio.to_thread(mod.run)
+            results[name] = r
+        except Exception as e:
+            results[name] = {"error": str(e), "pass": 0, "fail": 0}
+    return {"results": _serialize_result(results)}
+
+
 # ── WebSocket endpoints ────────────────────────────────────────────────────
 def _ws_origin_allowed(websocket: WebSocket) -> bool:
     """浏览器 WS 不受 CORS 约束，必须手动校验 Origin，防止跨站页面连本机。"""
     origin = websocket.headers.get("origin", "")
     if not origin:
-        return True  # 非浏览器客户端（无 Origin 头），受 127.0.0.1 绑定保护
+        return False
     return origin.rstrip("/") in {o.rstrip("/") for o in cfg.CORS_ORIGINS}
 
 
@@ -748,9 +1284,22 @@ async def _ws_reject(websocket: WebSocket) -> None:
     await websocket.close(code=4403, reason="Origin not allowed")
 
 
+def _ws_check_auth(websocket: WebSocket) -> bool:
+    """Validate auth token from query param before WS accept."""
+    from src import auth
+    token = websocket.query_params.get("token", "")
+    if not token:
+        return False
+    user = auth.get_session_user(token)
+    if user:
+        auth.touch_session(token)
+        return True
+    return False
+
+
 @app.websocket("/ws/market")
 async def ws_market(websocket: WebSocket):
-    if not _ws_origin_allowed(websocket):
+    if not _ws_origin_allowed(websocket) or not _ws_check_auth(websocket):
         return await _ws_reject(websocket)
     await websocket.accept()
     try:
@@ -781,7 +1330,7 @@ async def ws_market(websocket: WebSocket):
 
 @app.websocket("/ws/quotes/{code}")
 async def ws_quotes(websocket: WebSocket, code: str):
-    if not _ws_origin_allowed(websocket):
+    if not _ws_origin_allowed(websocket) or not _ws_check_auth(websocket):
         return await _ws_reject(websocket)
     await websocket.accept()
     try:
@@ -799,6 +1348,21 @@ async def ws_quotes(websocket: WebSocket, code: str):
                 await websocket.send_json(msg)
     except WebSocketDisconnect:
         logger.debug("WS quotes client disconnected")
+
+
+# ── React SPA serving (production) ─────────────────────────────────────────
+from pathlib import Path as _Path
+_frontend_dist = _Path(__file__).parent / "frontend" / "dist"
+if _frontend_dist.exists():
+    from fastapi.responses import FileResponse as _FileResponse
+    _index_html = _frontend_dist / "index.html"
+
+    @app.get("/{full_path:path}")
+    async def _spa_fallback(full_path: str):
+        candidate = _frontend_dist / full_path
+        if full_path and candidate.is_file():
+            return _FileResponse(str(candidate))
+        return _FileResponse(str(_index_html))
 
 
 if __name__ == "__main__":

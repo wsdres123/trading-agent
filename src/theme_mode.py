@@ -29,6 +29,9 @@ CORE_AMOUNT_YI = 100.0   # 趋势核心成交额阈值（亿）
 MIN_BOARD_STOCKS = 3     # 单日同板块候选票数 ≥3 视为板块强
 MIN_STREAK = 5           # 板块连续强天数 ≥5 判定主线
 
+_DETECT_CACHE: dict = {"key": None, "result": None, "ts": 0.0}
+_DETECT_TTL = 60  # 秒
+
 # 过于宽泛、无题材意义的板块不参与主线统计（指数成分/风格/市值/股东类）
 _GENERIC_BOARDS = {"融资融券", "机构重仓", "深股通", "沪股通", "标准普尔", "富时罗素",
                    "MSCI中国", "证金持股", "百元股", "创业板综", "转债标的",
@@ -174,6 +177,10 @@ def detect(start: str, end: str, min_ret30: float = MIN_RET30_PCT,
            min_amount_yi: float = MIN_AMOUNT_YI, min_board_stocks: int = MIN_BOARD_STOCKS,
            min_streak: int = MIN_STREAK) -> dict:
     """识别 [start, end] 区间内的主线板块与核心/补涨个股。日期格式 YYYY-MM-DD。"""
+    import time as _time
+    _cache_key = f"{start}_{end}_{min_ret30}_{min_amount_yi}_{min_board_stocks}_{min_streak}"
+    if _DETECT_CACHE["key"] == _cache_key and _time.time() - _DETECT_CACHE["ts"] < _DETECT_TTL:
+        return _DETECT_CACHE["result"]
     m = _matrices()
     if m is None:
         return {"error": "need_cache"}
@@ -335,10 +342,12 @@ def detect(start: str, end: str, min_ret30: float = MIN_RET30_PCT,
         "MA5": [_tma5(d["ti"]) for d in daily],
         "上升趋势": [d["ok_uptrend"] for d in daily],
     })
-    return {"has_mainline": bool(mainlines), "mainlines": mainlines,
+    result = {"has_mainline": bool(mainlines), "mainlines": mainlines,
             "daily": daily_df, "start": daily[0]["日期"], "end": daily[-1]["日期"],
             "gate_open_days": gate_open, "gate_total_days": len(daily),
             "turnover_idx": idx_df}
+    _DETECT_CACHE.update(key=_cache_key, result=result, ts=_time.time())
+    return result
 
 
 # ── 主线有效性评分（程序层）────────────────────────────────────────────────

@@ -26,7 +26,7 @@ JUDGE_TIME = "14:57"
 
 # 规范中的节点全集（模型输出约束，与竞价表CSV命名对齐）
 NODE_NAMES = ["混沌", "混沌分歧",
-              "主升--确认", "主升--加速", "主升--高潮", "主升--分歧",
+              "主升--确认", "主升--加速", "主升--高潮", "主升--分化", "主升--分歧",
               "主升--延续", "日内分歧转一致", "日内分歧未转一致",
               "退潮", "退潮加速", "退潮转衰竭", "退潮中继",
               "冰点", "冰点转折",
@@ -369,6 +369,7 @@ JUDGE_PROMPT = """A股情绪节点判断。只输出JSON：
    如果上证涨跌幅<0.4%，直接判修复--中等，不得判修复--强。
 3. 昨日大面少且今日涨停大增/高度板加速→主升类。主升--确认需同时满足：打板大面<8，热门股无跌停，热股指数涨超2%。打板大面≥8禁止判主升--确认。
 3a. 主升--高潮升级规则（优先级高于主升--确认）：若满足主升--确认全部条件，且同时满足：上证涨跌幅>1%、上证成交额比昨日放量2000亿以上、平均股价信号为"转"或"多"（涨幅较好）、大面<15（若连板空间数据有，需>6板），则应判主升--高潮而非主升--确认。主升--高潮是主升浪顶部情绪，特征是核心板块指数跳空大涨、补涨批量涨停、连板高度加速。注：平均股价涨超2%是高潮的强信号，但信号为"转"时若指数放量和涨幅足够，也可能是高潮。
+3b. 主升--分化规则（优先于规则6的混沌判断）：一般发生在主升类节点（确认/加速/高潮）后，指数震荡。判断条件：跌幅大于-7%的大于5个且小于20个，平均股价涨幅小于1%。若前一日为主升类节点（确认/加速/高潮/分化）且今日大面开始增多但未达退潮标准，应判主升--分化，不得判混沌。
 4. 退潮绝对门槛：退潮要求大面>50且热门股跌停≥3且热股指数跌超1%且龙头断板；退潮加速要求总跌停数>10且热门股跌停≥5；冰点要求大面>200且跌停>20且热股指数跌超3%。不满足门槛不得判对应退潮类。
 5. 节点流转约束：修复类次日不可能直接跳到退潮加速，中间至少经历混沌或退潮。冰点后的修复如果失败，优先判混沌/混沌分歧而非退潮加速。
 6. 前日大面低基数(≤10)时，相对增幅无意义，但若今日同时满足主升--确认硬条件（大面<20、跌停<10、涨停数≥50或涨超7数≥100、高度个股≥10、打板大面<8、热门股无跌停、热股指数涨超2%、指数上涨/平盘），应判主升--确认（或若满足规则3a则判主升--高潮），不强制混沌。否则按绝对值判断：大面<100且跌停<10→混沌/混沌分歧。
@@ -376,7 +377,9 @@ JUDGE_PROMPT = """A股情绪节点判断。只输出JSON：
 8. 拿不准选保守(混沌/修复)，设abstain=true或confidence<0.5，不要强行输出伪确定结论。
 
 输出前自检：
+- 准备输出"混沌"：若昨日情绪节点为主升类（确认/加速/高潮/分化）且今日大面5-20个、平均股价涨幅<1%，应改判主升--分化。
 - 准备输出"主升--高潮"：确认上证涨跌幅>1%、上证放量>2000亿（比昨日）、平均股价信号为"多"或涨超2%、大面<15。否则降为主升--确认。
+- 准备输出"主升--分化"：确认大面在5-20之间、平均股价涨幅<1%。否则按主升--确认或主升--分歧判断。
 - 准备输出"修复--强"：确认大面减幅≥90%、上证涨跌幅≥0.4%、打板大面<5。否则改为修复--中等。
 - 准备输出"主升--确认"：确认打板大面<8、热门股无跌停、热股指数涨超2%。若同时满足高潮条件，升级为主升--高潮。
 - 准备输出"退潮"：确认大面>50、热门股跌停≥3、热股指数跌超1%。否则降为混沌分歧。
@@ -391,6 +394,7 @@ JUDGE_PROMPT = """A股情绪节点判断。只输出JSON：
 近日盘面（旧→新）：
 {recent}
 
+昨日情绪节点：{prev_node}
 今日{today}（{daban_constraint}）
 {stats}
 {compare}
@@ -415,6 +419,7 @@ REVIEW_PROMPT_EMOTION = """A股情绪节点复核员。请根据以下**同一�
 3. 退潮门槛：大面>50且热门股跌停≥3且热股指数跌超1%；冰点：大面>200且跌停>20且热股指数跌超3%；退潮加速：总跌停数>10且热门股跌停≥5。
 4. 主升--确认硬条件：大面<20、跌停<10、热门股无跌停、热股指数涨超2%、打板大面<8；前日大面低基数(≤10)时满足以上条件应判主升--确认，不强制混沌。
 4a. 主升--高潮升级（优先于确认）：满足确认全部条件且上证涨跌幅>1%、上证放量比昨日+2000亿以上、平均股价信号"转"或"多"、大面<15→判主升--高潮。平均股价涨超2%是强信号但非必须，指数放量和涨幅才是核心门槛。
+4b. 主升--分化：高潮后指数震荡，跌幅大于-7%的大于5个且小于20个，平均股价涨幅小于1%。
 5. 拿不准选混沌，设abstain=true，不要强行输出伪确定结论。
 
 策略规范（单一事实来源）：
@@ -426,6 +431,7 @@ REVIEW_PROMPT_EMOTION = """A股情绪节点复核员。请根据以下**同一�
 近日盘面（旧→新）：
 {recent}
 
+昨日情绪节点：{prev_node}
 今日{today}（{daban_constraint}）
 {stats}
 {compare}
@@ -478,8 +484,8 @@ def _daman_compare(hist_stats: pd.DataFrame, today_stats: dict) -> str:
 def ai_judge(force: bool = False) -> dict:
     """判断今日情绪节点。每日缓存；force=True 重新判断。
 
-    使用结构化校验器：validate_emotion_decision() 对 LLM 输出进行
-    枚举校验、置信度截断、evidence 过滤、硬约束覆盖（打板大面/跌停门槛）。
+    快速模式：单次 qwen-turbo 调用，3秒超时，跳过双阶段复核。
+    使用 validate_emotion_decision() 进行结构化校验。
     """
     today = datetime.now().strftime("%Y-%m-%d")
     store = load_predictions()
@@ -490,16 +496,6 @@ def ai_judge(force: bool = False) -> dict:
         return {"error": "未配置 QWEN_API_KEY"}
 
     from src.llm_gateway import call_llm
-
-    # 若 metrics_cache 已过期，同步重建一次（保证历史统计含昨日数据）
-    try:
-        import time as _t
-        if not data.METRICS_CACHE.exists() or \
-                _t.time() - data.METRICS_CACHE.stat().st_mtime > data.METRICS_CACHE_TTL:
-            logger.info("ai_judge: metrics_cache 过期，同步重建中...")
-            data.build_metrics_cache()
-    except Exception as _e:
-        logger.warning("ai_judge: metrics_cache 重建失败: %s", _e)
 
     hist = load_auction_table()
     hist_lines = "\n".join(
@@ -520,7 +516,6 @@ def ai_judge(force: bool = False) -> dict:
         _db_constr = "打板大面数据不可用"
     hist_stats = stats_history(10)
     _db_col = "打板大面数" in hist_stats.columns
-    # 检查历史数据新鲜度：若最后一行日期不是昨日，追加警告
     _stale_warning = ""
     if not hist_stats.empty:
         _last_hist_date = hist_stats.iloc[-1]["日期"]
@@ -545,70 +540,41 @@ def ai_judge(force: bool = False) -> dict:
     if hot.get("热门个股指数") is not None:
         hot_lines = f"热指{hot['热门个股指数']:+.2f}%\n" + hot_lines
     spec_text = load_spec_text(EMO_SPEC)
+    _sorted_dates = sorted(store.keys(), reverse=True)
+    _prev_date = next((d for d in _sorted_dates if d < today), None)
+    _prev_node = store.get(_prev_date, {}).get("node", "") if _prev_date else "无"
     prompt = JUDGE_PROMPT.format(nodes="、".join(NODE_NAMES),
                                  history=hist_lines, recent=recent_lines,
                                  today=today, daban_constraint=_db_constr,
                                  stats=stats_lines, hot=hot_lines,
                                  compare=_daman_compare(hist_stats, stats),
-                                 spec=spec_text)
-    _fmt_kwargs = dict(nodes="、".join(NODE_NAMES), history=hist_lines,
-                       recent=recent_lines, today=today, daban_constraint=_db_constr,
-                       stats=stats_lines, hot=hot_lines,
-                       compare=_daman_compare(hist_stats, stats),
-                       spec=spec_text)
-    review_prompt = REVIEW_PROMPT_EMOTION.format(**_fmt_kwargs)
+                                 spec=spec_text, prev_node=_prev_node)
 
-    from src.schema_validator import validate_emotion_decision, dual_stage_review
+    from src.schema_validator import validate_emotion_decision
 
-    def _call_llm(model: str, llm_prompt: str = "") -> str | None:
-        """调用 LLM 返回原始文本，失败返回 None。"""
-        return call_llm(
-            prompt=llm_prompt or prompt,
-            model=model,
-            temperature=0.1,
-            max_tokens=500,
-            timeout=30.0,
-            retries=0,
-        )
-
-    # 尝试主模型 + 兜底模型，每个最多重试 1 次
-    validated = None
-    for model in ["qwen-plus", cfg.QWEN_CHAT_MODEL]:
-        for attempt in range(2):
-            raw = _call_llm(model, prompt)
-            if raw is None:
-                continue
-            result = validate_emotion_decision(raw, stats=stats)
-            if not result.get("abstain") or result["node"] != "混沌":
-                validated = result
-                break
-            if attempt == 0:
-                logger.info("校验返回混沌，重试一次 (%s)", model)
-        if validated and not validated.get("abstain"):
-            break
-
-    if validated is None:
-        logger.error("AI 情绪节点判断全部失败")
-        return {"error": "LLM 调用与校验均失败"}
-
-    # 双阶段复核：低置信/弃权/前后跳变 → 触发 qwen3.7-max 对抗式复核
-    store = load_predictions()
-    sorted_dates = sorted(store.keys(), reverse=True)
-    prev_result = store[sorted_dates[0]] if sorted_dates and sorted_dates[0] != today else None
-
-    def _validate_for_review(raw: str) -> dict:
-        return validate_emotion_decision(raw, stats=stats)
-
-    validated = dual_stage_review(
-        call_llm=_call_llm,
-        validate_fn=_validate_for_review,
-        stage1_result=validated,
-        prev_result=prev_result,
-        key_field="node",
-        review_prompt=review_prompt,
+    raw = call_llm(
+        prompt=prompt,
+        model=cfg.QWEN_TURBO_MODEL,
+        temperature=0.1,
+        max_tokens=300,
+        timeout=3.0,
+        retries=0,
     )
+    if raw is None:
+        logger.error("AI 情绪节点判断失败（3秒超时或错误）")
+        return {"error": "LLM 调用失败（3秒超时）"}
 
-    # 组装最终结果（向后兼容 + 新增字段）
+    validated = validate_emotion_decision(raw, stats=stats)
+
+    # 主升分化覆盖：LLM 容易在主升后误判混沌或主升--确认，用确定性规则纠正
+    if validated["node"] in ("混沌", "主升--确认") and _prev_node.startswith("主升"):
+        dm = stats.get("大面数", 0) or 0
+        sh_pct = stats.get("上证涨跌幅")
+        if 5 <= dm <= 20 and (sh_pct is None or abs(sh_pct) < 1):
+            validated["node"] = "主升--分化"
+            validated["reason"] = (f"昨日{_prev_node}，今日大面{dm}（5-20），"
+                                  f"指数震荡→主升--分化；{validated['reason']}")
+
     result = {
         "node": validated["node"],
         "reason": validated["reason"],
@@ -619,13 +585,9 @@ def ai_judge(force: bool = False) -> dict:
         "stats": stats,
         "prev_stats": hist_stats.iloc[-1].to_dict() if not hist_stats.empty else {},
         "time": datetime.now().strftime("%H:%M"),
-        "reviewed": validated.get("reviewed", False),
-        "agreed": validated.get("agreed", None),
+        "reviewed": False,
+        "agreed": None,
     }
-    if validated.get("review_note"):
-        result["review_note"] = validated["review_note"]
-    if validated.get("review_reason"):
-        result["review_reason"] = validated["review_reason"]
     store[today] = result
     _save_predictions(store)
     try:
@@ -635,7 +597,7 @@ def ai_judge(force: bool = False) -> dict:
             confidence=result["confidence"],
             evidence_snapshot=result.get("evidence", []),
             abstain=result.get("abstain", False),
-            model_id="qwen-plus",
+            model_id=cfg.QWEN_TURBO_MODEL,
         )
     except Exception:
         pass

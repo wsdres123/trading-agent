@@ -109,13 +109,18 @@ def remove_user(username: str) -> None:
 
 # ── Redis 会话（Redis 不可用时降级内存）────────────────────────────────────
 _rclient = None
+_rclient_fail_until = 0.0
 _MEM_SESSIONS: dict[str, tuple[str, float]] = {}
+
+_REDIS_RETRY_SECONDS = 60.0
 
 
 def _redis():
-    global _rclient
+    global _rclient, _rclient_fail_until
     if _rclient is not None:
         return _rclient or None
+    if time.time() < _rclient_fail_until:
+        return None
     try:
         import redis as _redis
         _rclient = _redis.Redis(
@@ -125,7 +130,8 @@ def _redis():
         )
         _rclient.ping()
     except Exception:
-        _rclient = False  # 记住不可用，避免每次重试
+        _rclient = False
+        _rclient_fail_until = time.time() + _REDIS_RETRY_SECONDS
     return _rclient or None
 
 
@@ -221,6 +227,29 @@ def verify(username: str, password: str) -> str | None:
         except Exception:
             pass
     return None
+
+
+def is_locked(username: str) -> bool:
+    """账户是否当前被锁定。"""
+    r = _redis()
+    if r:
+        try:
+            return bool(r.exists(LOCK_PREFIX + username))
+        except Exception:
+            return False
+    return False
+
+
+def fail_count(username: str) -> int:
+    """当前连续失败次数。"""
+    r = _redis()
+    if r:
+        try:
+            v = r.get(FAIL_PREFIX + username)
+            return int(v) if v else 0
+        except Exception:
+            return 0
+    return 0
 
 
 def bootstrap_admin_password(username: str = "admin") -> str | None:

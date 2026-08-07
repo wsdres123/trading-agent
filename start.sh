@@ -67,7 +67,18 @@ if command -v tailscale >/dev/null 2>&1; then
         echo "检测到 Tailscale，服务绑定 $BIND_IP（tailnet 内其他设备可访问，本机也用此地址）"
     fi
 fi
-export CORS_ORIGINS="http://localhost:8601,http://$BIND_IP:8601"
+export CORS_ORIGINS="http://localhost:8601,http://localhost:5173,http://$BIND_IP:8601,http://$BIND_IP:8602,https://trade.jiecaiai.com"
+
+# ── 前端构建：确保 dist/ 存在 ──────────────────────────────────────────────
+cd frontend
+if [ ! -d node_modules ]; then
+    echo "node_modules 不存在，执行 npm install..."
+    npm install --silent
+fi
+echo "构建前端..."
+npm run build
+cd ..
+echo "前端构建完成 → frontend/dist/"
 
 # ── FastAPI (background daemon) ───────────────────────────────────────────
 setsid /home/lixiang/anaconda3/bin/python3 -m uvicorn server:app \
